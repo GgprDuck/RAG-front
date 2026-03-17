@@ -30,7 +30,7 @@ type StreamChunkEvent =
   | { event: 'done';     metadata: Partial<StreamMeta> }
   | { event: 'error';    error: string };
 
-const API = 'http://localhost:3000';
+const API = import.meta.env.VITE_API_URL;
 
 /* ─── CSS variables & keyframes injected once ──────────────────────────────── */
 const GLOBAL_CSS = `
