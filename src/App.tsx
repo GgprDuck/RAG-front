@@ -187,12 +187,6 @@ const GLOBAL_CSS = `
   .toggle-thumb.off { left: 2px; background: var(--border2); }
 `;
 
-/* ─── Small reusable primitives ─────────────────────────────────────────────── */
-
-const Label: React.FC<{ children: React.ReactNode }> = ({ children }: any) => (
-  <div className="label">{children}</div>
-);
-
 const Toggle: React.FC<{ checked: boolean; onChange: (v: boolean) => void; label: string; sub?: string }> = ({ checked, onChange, label, sub }) => (
   <div onClick={() => onChange(!checked)} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', userSelect: 'none', padding: '4px 0' }}>
     <div className={`toggle-track ${checked ? 'on' : ''}`}>
@@ -244,7 +238,6 @@ const RangeField: React.FC<{
   );
 };
 
-/* ─── Status bar ─────────────────────────────────────────────────────────────── */
 const StatusBar: React.FC<{ msg: { text: string; type: 'ok' | 'err' | 'info' } | null }> = ({ msg }) => {
   if (!msg) return null;
   const cfg = {
@@ -259,12 +252,10 @@ const StatusBar: React.FC<{ msg: { text: string; type: 'ok' | 'err' | 'info' } |
   );
 };
 
-/* ─── Spinner ────────────────────────────────────────────────────────────────── */
 const Spin: React.FC<{ size?: number }> = ({ size = 12 }) => (
   <span style={{ width: size, height: size, border: `2px solid var(--border2)`, borderTopColor: 'var(--accent)', borderRadius: '50%', display: 'inline-block', animation: 'spin .55s linear infinite', flexShrink: 0 }} />
 );
 
-/* ─── AskPanel ───────────────────────────────────────────────────────────────── */
 const AskPanel: React.FC<{
   rows?: number;
   question: string;
@@ -297,11 +288,9 @@ const AskPanel: React.FC<{
   </div>
 );
 
-/* ─── Main App ───────────────────────────────────────────────────────────────── */
 const RagDemo: React.FC = () => {
   const [mode, setMode] = useState<UploadMode>('knowledge');
 
-  /* Upload */
   const [file, setFile] = useState<File | null>(null);
   const [folderFiles, setFolderFiles] = useState<File[]>([]);
   const [images, setImages] = useState<File[]>([]);
@@ -309,7 +298,6 @@ const RagDemo: React.FC = () => {
   const [enableKnowledgeGraph, setEnableKnowledgeGraph] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  /* Ask / streaming */
   const [question, setQuestion] = useState('');
   const [streamText, setStreamText] = useState('');
   const [streamMeta, setStreamMeta] = useState<StreamMeta | null>(null);
@@ -317,7 +305,6 @@ const RagDemo: React.FC = () => {
   const [lightboxImg, setLightboxImg] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  /* Pipeline toggles */
   const [useHybridSearch, setUseHybridSearch] = useState(true);
   const [useReranking, setUseReranking] = useState(true);
   const [rerankStrategy, setRerankStrategy] = useState<RerankStrategy>('none');
@@ -328,7 +315,6 @@ const RagDemo: React.FC = () => {
   const [useKnowledgeGraph, setUseKnowledgeGraph] = useState(false);
   const [includeSources, setIncludeSources] = useState(false);
 
-  /* Generation params */
   const [limit, setLimit] = useState<number | undefined>(undefined);
   const [scoreThreshold, setScoreThreshold] = useState<number | undefined>(undefined);
   const [temperature, setTemperature] = useState<number | undefined>(undefined);
@@ -336,14 +322,12 @@ const RagDemo: React.FC = () => {
   const [topK, setTopK] = useState<number | undefined>(undefined);
   const [maxTokens, setMaxTokens] = useState<number | undefined>(undefined);
 
-  /* Session */
   const [sessionId] = useState(`session_${Date.now()}`);
   const [conversationHistory, setConversationHistory] = useState<Array<{ role: string; content: string }>>([]);
 
-  /* Lists */
   const [retrievedImages, setRetrievedImages] = useState<ImageData[]>([]);
   const [allDocuments, setAllDocuments] = useState<DocumentData[]>([]);
-  const [expandedImages, setExpandedImages] = useState<Record<string, boolean>>({});
+  const [expandedImages] = useState<Record<string, boolean>>({});
   const [expandedSources, setExpandedSources] = useState(false);
   const [evalResults, setEvalResults] = useState<any>(null);
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
@@ -363,7 +347,6 @@ const RagDemo: React.FC = () => {
     if (mode === 'all-documents') handleRetrieveAllDocuments();
   }, [mode]);
 
-  /* auto-scroll while streaming */
   useEffect(() => {
     if (isStreaming) answerEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [streamText, isStreaming]);
