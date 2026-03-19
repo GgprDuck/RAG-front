@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { flushSync } from 'react-dom';
 import axios from 'axios';
 
 type UploadMode = 'knowledge' | 'images' | 'image-query' | 'all-images' | 'all-documents' | 'advanced-rag' | 'evaluation';
@@ -21,18 +22,17 @@ type StreamMeta = {
   sources?: SourceDoc[];
 };
 
-// ── IStreamChunk event types (mirrors backend) ────────────────────────────────
 type StreamChunkEvent =
-  | { event: 'metadata'; metadata: Partial<StreamMeta> & { conversationContext?: boolean } }
-  | { event: 'sources';  sources: SourceDoc[] }
-  | { event: 'token';    token: string }
-  | { event: 'citations'; citations: Citation[] }
-  | { event: 'done';     metadata: Partial<StreamMeta> }
-  | { event: 'error';    error: string };
+  | { event: 'metadata';   metadata: Partial<StreamMeta> & { conversationContext?: boolean } }
+  | { event: 'sources';    sources: SourceDoc[] }
+  | { event: 'token';      token: string }
+  | { event: 'citations';  citations: Citation[] }
+  | { event: 'correction'; correctedAnswer: string; reason: 'hallucination' }
+  | { event: 'done';       metadata: Partial<StreamMeta> }
+  | { event: 'error';      error: string };
 
 const API = import.meta.env.VITE_API_URL;
 
-/* ─── CSS variables & keyframes injected once ──────────────────────────────── */
 const GLOBAL_CSS = `
   @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;0,700;1,400&family=IBM+Plex+Sans:wght@300;400;500;700&display=swap');
 
@@ -71,17 +71,9 @@ const GLOBAL_CSS = `
     box-shadow: 0 0 6px rgba(200,245,96,.4);
   }
 
-  @keyframes spin { to { transform: rotate(360deg); } }
-  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
-  @keyframes fadeUp { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
-  @keyframes scanline {
-    0% { transform: translateY(-100%); }
-    100% { transform: translateY(100vh); }
-  }
-  @keyframes pulse-border {
-    0%,100% { border-color: var(--accent); }
-    50% { border-color: transparent; }
-  }
+  @keyframes spin    { to { transform: rotate(360deg); } }
+  @keyframes blink   { 0%,100%{opacity:1} 50%{opacity:0} }
+  @keyframes fadeUp  { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
 
   .fade-up { animation: fadeUp .25s ease both; }
 
@@ -120,14 +112,14 @@ const GLOBAL_CSS = `
     padding: 2px 7px; border-radius: 3px;
     border: 1px solid var(--border2); color: var(--muted);
   }
-  .tag.green { border-color: rgba(200,245,96,.25); color: var(--accent); background: rgba(200,245,96,.05); }
+  .tag.green  { border-color: rgba(200,245,96,.25); color: var(--accent);  background: rgba(200,245,96,.05); }
   .tag.orange { border-color: rgba(245,166,35,.25); color: var(--accent2); background: rgba(245,166,35,.05); }
-  .tag.red { border-color: rgba(242,87,87,.25); color: var(--red); background: rgba(242,87,87,.05); }
-  .tag.blue { border-color: rgba(91,156,246,.25); color: var(--blue); background: rgba(91,156,246,.05); }
+  .tag.red    { border-color: rgba(242,87,87,.25);  color: var(--red);     background: rgba(242,87,87,.05);  }
+  .tag.blue   { border-color: rgba(91,156,246,.25); color: var(--blue);    background: rgba(91,156,246,.05); }
 
   .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
   .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-  .col { display: flex; flex-direction: column; gap: 14px; }
+  .col    { display: flex; flex-direction: column; gap: 14px; }
 
   .card {
     background: var(--surface);
@@ -183,8 +175,8 @@ const GLOBAL_CSS = `
     position: absolute; top: 2px; width: 11px; height: 11px;
     border-radius: 50%; transition: left .2s;
   }
-  .toggle-thumb.on { left: 15px; background: #080808; }
-  .toggle-thumb.off { left: 2px; background: var(--border2); }
+  .toggle-thumb.on  { left: 15px; background: #080808; }
+  .toggle-thumb.off { left: 2px;  background: var(--border2); }
 `;
 
 const Toggle: React.FC<{ checked: boolean; onChange: (v: boolean) => void; label: string; sub?: string }> = ({ checked, onChange, label, sub }) => (
@@ -202,10 +194,10 @@ const Toggle: React.FC<{ checked: boolean; onChange: (v: boolean) => void; label
 const Btn: React.FC<{ onClick: () => void; disabled?: boolean; danger?: boolean; children: React.ReactNode; accent?: boolean }> = ({ onClick, disabled, danger, children, accent }) => (
   <button onClick={onClick} disabled={disabled} style={{
     width: '100%', padding: '.65rem 1.2rem', borderRadius: 7,
-    border: danger ? '1px solid rgba(242,87,87,.2)' : accent ? '1px solid rgba(200,245,96,.3)' : '1px solid var(--border2)',
-    background: danger ? 'rgba(242,87,87,.06)' : accent && !disabled ? 'rgba(200,245,96,.1)' : 'var(--surface)',
-    color: disabled ? 'var(--dim)' : danger ? 'var(--red)' : accent ? 'var(--accent)' : 'var(--muted)',
-    cursor: disabled ? 'not-allowed' : 'pointer',
+    border:      danger ? '1px solid rgba(242,87,87,.2)' : accent ? '1px solid rgba(200,245,96,.3)' : '1px solid var(--border2)',
+    background:  danger ? 'rgba(242,87,87,.06)' : accent && !disabled ? 'rgba(200,245,96,.1)' : 'var(--surface)',
+    color:       disabled ? 'var(--dim)' : danger ? 'var(--red)' : accent ? 'var(--accent)' : 'var(--muted)',
+    cursor:      disabled ? 'not-allowed' : 'pointer',
     fontFamily: 'var(--mono)', fontWeight: 500, fontSize: '.8rem', letterSpacing: '.06em',
     transition: 'all .15s',
   }}>{children}</button>
@@ -273,7 +265,6 @@ const AskPanel: React.FC<{
       rows={rows}
       style={{ marginBottom: 10 }}
       placeholder="Ask anything… (⌘↵ to send)"
-      autoFocus={false}
     />
     <div style={{ display: 'flex', gap: 8 }}>
       <Btn onClick={onAsk} disabled={isStreaming || !question.trim()} accent={!isStreaming && !!question.trim()}>
@@ -302,8 +293,10 @@ const RagDemo: React.FC = () => {
   const [streamText, setStreamText] = useState('');
   const [streamMeta, setStreamMeta] = useState<StreamMeta | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [isCorrected, setIsCorrected] = useState(false);
   const [lightboxImg, setLightboxImg] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const accumulatedRef = useRef('');
 
   const [useHybridSearch, setUseHybridSearch] = useState(true);
   const [useReranking, setUseReranking] = useState(true);
@@ -343,38 +336,15 @@ const RagDemo: React.FC = () => {
     setStreamText(''); setStreamMeta(null); setRetrievedImages([]);
     setGeneratedImage(null); setStatus(null); setAllDocuments([]);
     setEvalResults(null); setConversationHistory([]); setExpandedSources(false);
-    if (mode === 'all-images') handleRetrieveAllImages();
-    if (mode === 'all-documents') handleRetrieveAllDocuments();
+    setIsCorrected(false);
+    if (mode === 'all-images')     handleRetrieveAllImages();
+    if (mode === 'all-documents')  handleRetrieveAllDocuments();
   }, [mode]);
 
   useEffect(() => {
     if (isStreaming) answerEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [streamText, isStreaming]);
 
-  /* ─── Streaming ask ─────────────────────────────────────────────────────────
-   *
-   * The backend sends standard SSE (text/event-stream):
-   *
-   *   event: metadata
-   *   data: {"event":"metadata","metadata":{...}}
-   *
-   *   event: sources
-   *   data: {"event":"sources","sources":[...]}
-   *
-   *   event: token
-   *   data: {"event":"token","token":"Hello"}
-   *
-   *   event: citations
-   *   data: {"event":"citations","citations":[...]}
-   *
-   *   event: done
-   *   data: {"event":"done","metadata":{...}}
-   *
-   * SSE messages are separated by a blank line (\n\n).  Each message may
-   * contain an "event:" field (the event name) and a "data:" field (JSON).
-   * We accumulate raw bytes, split on \n\n to get complete messages, then
-   * dispatch on `chunk.event`.
-   */
   const handleAsk = useCallback(async () => {
     if (!question.trim() || isStreaming) return;
 
@@ -382,10 +352,14 @@ const RagDemo: React.FC = () => {
     const ctrl = new AbortController();
     abortRef.current = ctrl;
 
-    setStreamText('');
-    setStreamMeta(null);
-    setIsStreaming(true);
-    setExpandedSources(false);
+    accumulatedRef.current = '';
+    flushSync(() => {
+      setStreamText('');
+      setStreamMeta(null);
+      setIsCorrected(false);
+      setIsStreaming(true);
+      setExpandedSources(false);
+    });
 
     const body = {
       question,
@@ -399,41 +373,35 @@ const RagDemo: React.FC = () => {
       maxTokens,
       conversationHistory: useConversationMemory ? conversationHistory : undefined,
       options: {
-        useHybridSearch, 
-        useReranking, 
+        useHybridSearch,
+        useReranking,
         useQueryTransformation,
-        useContextualCompression, 
+        useContextualCompression,
         useConversationMemory,
-        sessionId, 
-        useCitationTracking, 
+        sessionId,
+        useCitationTracking,
         useKnowledgeGraph,
       },
     };
 
-    let accumulated = '';
-
     try {
       const res = await fetch(`${API}/rag/documents/ask/stream`, {
-        method: 'POST',
+        method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-        signal: ctrl.signal,
+        body:    JSON.stringify(body),
+        signal:  ctrl.signal,
       });
 
       if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
 
       const reader  = res.body.getReader();
       const decoder = new TextDecoder();
-
-      // Tail holds bytes from an incomplete SSE message (no trailing \n\n yet).
       let tail = '';
 
-      // ── SSE dispatch ────────────────────────────────────────────────────────
       const dispatch = (chunk: StreamChunkEvent) => {
         switch (chunk.event) {
 
           case 'metadata':
-            // Emitted before the first token — queryType, generationParams, etc.
             setStreamMeta(prev => ({
               images:         [],
               citations:      prev?.citations      ?? [],
@@ -444,16 +412,30 @@ const RagDemo: React.FC = () => {
             break;
 
           case 'sources':
-            setStreamMeta(prev => ({ ...(prev ?? { images: [], citations: [], relevantChunks: 0 }), sources: chunk.sources }));
+            setStreamMeta(prev => ({
+              ...(prev ?? { images: [], citations: [], relevantChunks: 0 }),
+              sources: chunk.sources,
+            }));
             break;
 
           case 'token':
-            accumulated += chunk.token;
-            setStreamText(accumulated);
+            accumulatedRef.current += chunk.token;
+            flushSync(() => setStreamText(accumulatedRef.current));
+            break;
+
+          case 'correction':
+            accumulatedRef.current = chunk.correctedAnswer;
+            flushSync(() => {
+              setStreamText(chunk.correctedAnswer);
+              setIsCorrected(true);
+            });
             break;
 
           case 'citations':
-            setStreamMeta(prev => ({ ...(prev ?? { images: [], citations: [], relevantChunks: 0 }), citations: chunk.citations }));
+            setStreamMeta(prev => ({
+              ...(prev ?? { images: [], citations: [], relevantChunks: 0 }),
+              citations: chunk.citations,
+            }));
             break;
 
           case 'done':
@@ -467,61 +449,54 @@ const RagDemo: React.FC = () => {
             setConversationHistory(prev => [
               ...prev,
               { role: 'user',      content: question },
-              { role: 'assistant', content: accumulated },
+              { role: 'assistant', content: accumulatedRef.current },
             ]);
             break;
 
           case 'error':
-            setStreamText(`⚠ ${chunk.error}`);
+            flushSync(() => setStreamText(`⚠ ${chunk.error}`));
             break;
         }
       };
 
-      // ── Read stream ─────────────────────────────────────────────────────────
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
         tail += decoder.decode(value, { stream: true });
 
-        // Split on blank lines — each complete SSE message ends with \n\n
         const messages = tail.split('\n\n');
-        tail = messages.pop() ?? '';   // last element may be incomplete
+        tail = messages.pop() ?? '';
 
         for (const msg of messages) {
           if (!msg.trim()) continue;
 
-          // Parse "field: value" lines within the message
           let dataStr = '';
           for (const line of msg.split('\n')) {
-            if (line.startsWith('data: ')) {
-              dataStr += line.slice(6);   // concatenate multi-line data values
-            }
-            // (We don't need the "event:" field — chunk.event carries the type)
+            if (line.startsWith('data: ')) dataStr += line.slice(6);
           }
 
           if (!dataStr.trim()) continue;
 
           try {
             dispatch(JSON.parse(dataStr) as StreamChunkEvent);
-          } catch { /* malformed JSON — skip */ }
+          } catch { }
         }
       }
     } catch (e: any) {
       if (e.name !== 'AbortError') {
-        setStreamText(`⚠ Stream error: ${e.message}`);
+        flushSync(() => setStreamText(`⚠ Stream error: ${e.message}`));
       }
     } finally {
       setIsStreaming(false);
     }
-  }, [question, isStreaming, rerankStrategy, includeSources, limit, scoreThreshold,
+  }, [question, isStreaming, rerankStrategy, limit, scoreThreshold,
       temperature, topP, topK, maxTokens, conversationHistory, useHybridSearch,
       useReranking, useQueryTransformation, useContextualCompression,
       useConversationMemory, sessionId, useCitationTracking, useKnowledgeGraph]);
 
   const handleStopStream = () => { abortRef.current?.abort(); setIsStreaming(false); };
 
-  /* ─── Upload handlers ─────────────────────────────────────────────────────── */
   const handleUploadKnowledge = async () => {
     if (!file) return err('Choose a file.');
     const fd = new FormData();
@@ -597,7 +572,6 @@ const RagDemo: React.FC = () => {
     } catch (e: any) { err(e.message); } finally { setBusy(false); }
   };
 
-  /* ─── Compound panels ──────────────────────────────────────────────────────── */
   const renderPipelinePanel = () => (
     <div className="card">
       <div className="label">Pipeline</div>
@@ -628,8 +602,8 @@ const RagDemo: React.FC = () => {
 
       <div className="divider">
         <div className="label">Retrieval</div>
-        <RangeField label="Chunks"           value={limit}          onChange={setLimit}          min={1}   max={20}   step={1}    placeholder="6" />
-        <RangeField label="Score threshold"  value={scoreThreshold} onChange={setScoreThreshold} min={0}   max={1}    step={0.05} fmt={v => v.toFixed(2)} placeholder="off" />
+        <RangeField label="Chunks"          value={limit}          onChange={setLimit}          min={1}   max={20}   step={1}    placeholder="6" />
+        <RangeField label="Score threshold" value={scoreThreshold} onChange={setScoreThreshold} min={0}   max={1}    step={0.05} fmt={v => v.toFixed(2)} placeholder="off" />
       </div>
 
       <div className="divider">
@@ -664,30 +638,32 @@ const RagDemo: React.FC = () => {
     const isErr = streamText.startsWith('⚠');
 
     return (
-      <div className="card fade-up" style={{ borderColor: isErr ? 'rgba(242,87,87,.2)' : isStreaming ? 'rgba(200,245,96,.1)' : 'var(--border)', transition: 'border-color .4s', marginTop: 20 }}>
+      <div className="card fade-up" style={{
+        borderColor: isErr ? 'rgba(242,87,87,.2)' : isCorrected ? 'rgba(242,87,87,.15)' : isStreaming ? 'rgba(200,245,96,.1)' : 'var(--border)',
+        transition: 'border-color .4s',
+        marginTop: 20,
+      }}>
 
-        {/* Header row */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div className="label" style={{ marginBottom: 0 }}>Answer</div>
             {isStreaming && <Spin size={9} />}
+            {isCorrected && <span className="tag red">hallucination filtered</span>}
           </div>
           {streamMeta && (
             <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-              {streamMeta.queryType    && <span className={`tag ${streamMeta.queryType === 'entity' ? 'blue' : streamMeta.queryType === 'wide' ? 'orange' : 'green'}`}>{streamMeta.queryType}</span>}
-              {streamMeta.confidence   !== undefined && <span className="tag green">{(streamMeta.confidence * 100).toFixed(0)}% conf</span>}
+              {streamMeta.queryType      && <span className={`tag ${streamMeta.queryType === 'entity' ? 'blue' : streamMeta.queryType === 'wide' ? 'orange' : 'green'}`}>{streamMeta.queryType}</span>}
+              {streamMeta.confidence !== undefined && <span className="tag green">{(streamMeta.confidence * 100).toFixed(0)}% conf</span>}
               {streamMeta.relevantChunks !== undefined && <span className="tag">{streamMeta.relevantChunks} chunks</span>}
             </div>
           )}
         </div>
 
-        {/* Streaming text */}
         <div className="answer-text">
           {streamText}
           {isStreaming && <span className="streaming-cursor" />}
         </div>
 
-        {/* Image links from meta */}
         {streamMeta?.images && streamMeta.images.length > 0 && (
           <div className="divider">
             <div className="label">Images ({streamMeta.images.length})</div>
@@ -702,7 +678,6 @@ const RagDemo: React.FC = () => {
           </div>
         )}
 
-        {/* Citations */}
         {streamMeta?.citations && streamMeta.citations.length > 0 && (
           <div className="divider">
             <div className="label">Citations ({streamMeta.citations.length})</div>
@@ -720,7 +695,6 @@ const RagDemo: React.FC = () => {
           </div>
         )}
 
-        {/* Sources */}
         {streamMeta?.sources && streamMeta.sources.length > 0 && (
           <div className="divider">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
@@ -748,7 +722,6 @@ const RagDemo: React.FC = () => {
     );
   };
 
-  /* ─── Lightbox ───────────────────────────────────────────────────────────── */
   const renderLightbox = () => {
     if (!lightboxImg) return null;
     return (
@@ -763,18 +736,16 @@ const RagDemo: React.FC = () => {
     );
   };
 
-  /* ─── Nav tabs ───────────────────────────────────────────────────────────── */
   const TABS: { id: UploadMode; label: string }[] = [
-    { id: 'knowledge',      label: 'Knowledge'   },
-    { id: 'advanced-rag',   label: 'Advanced RAG'},
-    { id: 'images',         label: 'Images'      },
-    { id: 'image-query',    label: 'Image Query' },
-    { id: 'all-images',     label: 'All Images'  },
-    { id: 'all-documents',  label: 'All Docs'    },
-    { id: 'evaluation',     label: 'Evaluation'  },
+    { id: 'knowledge',     label: 'Knowledge'    },
+    { id: 'advanced-rag',  label: 'Advanced RAG' },
+    { id: 'images',        label: 'Images'       },
+    { id: 'image-query',   label: 'Image Query'  },
+    { id: 'all-images',    label: 'All Images'   },
+    { id: 'all-documents', label: 'All Docs'     },
+    { id: 'evaluation',    label: 'Evaluation'   },
   ];
 
-  /* ─── Render ─────────────────────────────────────────────────────────────── */
   return (
     <>
       <style>{GLOBAL_CSS}</style>
@@ -782,7 +753,6 @@ const RagDemo: React.FC = () => {
 
       <div style={{ minHeight: '100vh', minWidth: '100vw', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'var(--sans)', display: 'flex', flexDirection: 'column' }}>
 
-        {/* Header */}
         <header style={{ padding: '1.4rem 28px 0', display: 'flex', alignItems: 'baseline', gap: 12 }}>
           <div style={{ fontFamily: 'var(--mono)', fontSize: '1rem', fontWeight: 700, letterSpacing: '.14em', color: 'var(--text)' }}>RAG</div>
           <div style={{ fontFamily: 'var(--mono)', fontSize: '.6rem', color: 'var(--dim)', letterSpacing: '.18em' }}>SYSTEM</div>
@@ -791,7 +761,6 @@ const RagDemo: React.FC = () => {
           </div>
         </header>
 
-        {/* Tab bar */}
         <nav style={{ display: 'flex', gap: 0, padding: '0 28px', borderBottom: '1px solid var(--border)', marginTop: 10, overflowX: 'auto' }}>
           {TABS.map(tab => (
             <button key={tab.id} onClick={() => { if (mode !== tab.id) { setMode(tab.id); setQuestion(''); } }}
@@ -811,10 +780,8 @@ const RagDemo: React.FC = () => {
 
         <StatusBar msg={status} />
 
-        {/* Content */}
         <main style={{ flex: 1, padding: '20px 28px', maxWidth: 1120, width: '100%', margin: '0 auto', alignSelf: 'stretch', boxSizing: 'border-box' }}>
 
-          {/* ── Knowledge ── */}
           {mode === 'knowledge' && (
             <div className="grid-2">
               <div className="col">
@@ -857,15 +824,13 @@ const RagDemo: React.FC = () => {
             </div>
           )}
 
-          {/* ── Advanced RAG ── */}
           {mode === 'advanced-rag' && (
             <div style={{ margin: '0 auto' }}>
-                <AskPanel rows={6} question={question} setQuestion={setQuestion} isStreaming={isStreaming} onAsk={handleAsk} onStop={handleStopStream} />
-                {renderAnswerPanel()}
+              <AskPanel rows={6} question={question} setQuestion={setQuestion} isStreaming={isStreaming} onAsk={handleAsk} onStop={handleStopStream} />
+              {renderAnswerPanel()}
             </div>
           )}
 
-          {/* ── Images upload + search ── */}
           {(mode === 'images' || mode === 'image-query') && (
             <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: 14 }}>
               <div className="col">
@@ -903,7 +868,6 @@ const RagDemo: React.FC = () => {
             </div>
           )}
 
-          {/* ── All Images ── */}
           {mode === 'all-images' && (
             retrievedImages.length > 0 ? (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(195px, 1fr))', gap: 12 }}>
@@ -929,7 +893,6 @@ const RagDemo: React.FC = () => {
             ) : <div style={{ textAlign: 'center', fontFamily: 'var(--mono)', fontSize: '.8rem', color: 'var(--dim)', padding: '5rem 0' }}>No images in store</div>
           )}
 
-          {/* ── All Documents ── */}
           {mode === 'all-documents' && (
             allDocuments.length > 0 ? (
               <div className="col">
@@ -954,7 +917,6 @@ const RagDemo: React.FC = () => {
             ) : <div style={{ textAlign: 'center', fontFamily: 'var(--mono)', fontSize: '.8rem', color: 'var(--dim)', padding: '5rem 0' }}>No documents in store</div>
           )}
 
-          {/* ── Evaluation ── */}
           {mode === 'evaluation' && (
             <div style={{ maxWidth: 700 }}>
               <div className="card">
