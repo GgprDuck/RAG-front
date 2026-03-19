@@ -403,9 +403,6 @@ const Spin: React.FC<{ size?: number }> = ({ size = 12 }) => (
   <span style={{ width: size, height: size, border: `2px solid var(--border2)`, borderTopColor: 'var(--accent)', borderRadius: '50%', display: 'inline-block', animation: 'spin .55s linear infinite', flexShrink: 0 }} />
 );
 
-// Utility to generate unique IDs
-const uid = () => `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-
 // Chat Sidebar
 const ChatSidebar: React.FC<{
   chats: Chat[];
@@ -588,7 +585,6 @@ const RagDemo: React.FC = () => {
 
   const [retrievedImages, setRetrievedImages] = useState<ImageData[]>([]);
   const [allDocuments, setAllDocuments] = useState<DocumentData[]>([]);
-  const [expandedImages] = useState<Record<string, boolean>>({});
   const [evalResults, setEvalResults] = useState<any>(null);
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [lightboxImg, setLightboxImg] = useState<string | null>(null);
