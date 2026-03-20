@@ -330,8 +330,7 @@ const MessageBubble: React.FC<{ msg: ChatMessage; onLightbox: (url: string) => v
   );
 };
 
-// ─── ChatInput ────────────────────────────────────────────────
-const ChatInput: React.FC<{ question: string; setQuestion: (v: string) => void; onSend: () => void; onStop: () => void; isStreaming: boolean; hasMessages: boolean; textareaRef: React.RefObject<HTMLTextAreaElement> }> = ({ question, setQuestion, onSend, onStop, isStreaming, hasMessages, textareaRef }) => {
+const ChatInput: React.FC<{ question: string; setQuestion: (v: string) => void; onSend: () => void; onStop: () => void; isStreaming: boolean; hasMessages: boolean; textareaRef: React.RefObject<HTMLTextAreaElement | null> }> = ({ question, setQuestion, onSend, onStop, isStreaming, hasMessages, textareaRef }) => {
   const handleKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (!isStreaming && question.trim()) onSend(); } };
   if (!hasMessages) return (
     <div className="absolute inset-0 flex flex-col items-center justify-center z-10 pointer-events-none animate-fade-in">
@@ -699,7 +698,6 @@ const RagDemo: React.FC = () => {
         </div>
       )}
 
-      {/* Other tabs */}
       {mode !== 'advanced-rag' && (
         <main key={mode} className="animate-tab-fade flex-1 overflow-auto p-5 px-7 max-w-[1140px] w-full mx-auto self-stretch">
           {mode === 'knowledge' && (
