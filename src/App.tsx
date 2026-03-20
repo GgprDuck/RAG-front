@@ -244,21 +244,21 @@ const Btn: React.FC<{ onClick: () => void; disabled?: boolean; danger?: boolean;
 );
 
 // ─── RangeField ───────────────────────────────────────────────
-const RangeField: React.FC<{ label: string; value: number | undefined; onChange: (v: number | undefined) => void; min: number; max: number; step: number; fmt?: (v: number) => string; placeholder?: string }> = ({ label, value, onChange, min, max, step, fmt, placeholder = 'auto' }) => {
-  const pct = value !== undefined ? ((value - min) / (max - min)) * 100 : 0;
-  return (
-    <div className="mb-3.5">
-      <div className="flex justify-between mb-1.5">
-        <span className="font-mono text-[0.6rem] tracking-[.1em] uppercase text-muted">{label}</span>
-        <div className="flex gap-1.5 items-center">
-          <span className={`font-mono text-[0.72rem] ${value !== undefined ? 'text-accent' : 'text-dim'}`}>{value !== undefined ? (fmt ? fmt(value) : value) : placeholder}</span>
-          {value !== undefined && <span onClick={() => onChange(undefined)} className="font-mono text-[0.6rem] text-muted cursor-pointer px-1 border border-border2 rounded-[3px]">✕</span>}
-        </div>
-      </div>
-      <input type="range" min={min} max={max} step={step} value={value ?? min} style={{ '--pct': `${pct}%` } as any} onChange={e => onChange(parseFloat(e.target.value))} />
-    </div>
-  );
-};
+// const RangeField: React.FC<{ label: string; value: number | undefined; onChange: (v: number | undefined) => void; min: number; max: number; step: number; fmt?: (v: number) => string; placeholder?: string }> = ({ label, value, onChange, min, max, step, fmt, placeholder = 'auto' }) => {
+//   const pct = value !== undefined ? ((value - min) / (max - min)) * 100 : 0;
+//   return (
+//     <div className="mb-3.5">
+//       <div className="flex justify-between mb-1.5">
+//         <span className="font-mono text-[0.6rem] tracking-[.1em] uppercase text-muted">{label}</span>
+//         <div className="flex gap-1.5 items-center">
+//           <span className={`font-mono text-[0.72rem] ${value !== undefined ? 'text-accent' : 'text-dim'}`}>{value !== undefined ? (fmt ? fmt(value) : value) : placeholder}</span>
+//           {value !== undefined && <span onClick={() => onChange(undefined)} className="font-mono text-[0.6rem] text-muted cursor-pointer px-1 border border-border2 rounded-[3px]">✕</span>}
+//         </div>
+//       </div>
+//       <input type="range" min={min} max={max} step={step} value={value ?? min} style={{ '--pct': `${pct}%` } as any} onChange={e => onChange(parseFloat(e.target.value))} />
+//     </div>
+//   );
+// };
 
 // ─── Spin ─────────────────────────────────────────────────────
 const Spin: React.FC<{ size?: number }> = ({ size = 12 }) => (
@@ -594,58 +594,58 @@ const ChatInput: React.FC<{
 };
 
 // ─── PipelinePanel ────────────────────────────────────────────
-interface PipelineProps {
-  useHybridSearch:boolean;setUseHybridSearch:(v:boolean)=>void;
-  useQueryTransformation:boolean;setUseQueryTransformation:(v:boolean)=>void;
-  useContextualCompression:boolean;setUseContextualCompression:(v:boolean)=>void;
-  useCitationTracking:boolean;setUseCitationTracking:(v:boolean)=>void;
-  useConversationMemory:boolean;setUseConversationMemory:(v:boolean)=>void;
-  useKnowledgeGraph:boolean;setUseKnowledgeGraph:(v:boolean)=>void;
-  includeSources:boolean;setIncludeSources:(v:boolean)=>void;
-  useReranking:boolean;setUseReranking:(v:boolean)=>void;
-  rerankStrategy:RerankStrategy;setRerankStrategy:(v:RerankStrategy)=>void;
-  limit:number|undefined;setLimit:(v:number|undefined)=>void;
-  scoreThreshold:number|undefined;setScoreThreshold:(v:number|undefined)=>void;
-  temperature:number|undefined;setTemperature:(v:number|undefined)=>void;
-  topP:number|undefined;setTopP:(v:number|undefined)=>void;
-  topK:number|undefined;setTopK:(v:number|undefined)=>void;
-  maxTokens:number|undefined;setMaxTokens:(v:number|undefined)=>void;
-}
-const PipelinePanel: React.FC<PipelineProps> = (p) => (
-  <div className="bg-surface border border-border rounded-xl p-[18px]">
-    <div className="font-mono text-[0.6rem] font-semibold tracking-[.12em] uppercase text-dim mb-2">Pipeline</div>
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
-      <Toggle checked={p.useHybridSearch} onChange={p.setUseHybridSearch} label="Hybrid Search" sub="Vector + BM25" />
-      <Toggle checked={p.useQueryTransformation} onChange={p.setUseQueryTransformation} label="Query Expansion" sub="Rephrase + expand" />
-      <Toggle checked={p.useContextualCompression} onChange={p.setUseContextualCompression} label="Compression" sub="Extract relevant" />
-      <Toggle checked={p.useCitationTracking} onChange={p.setUseCitationTracking} label="Citations" sub="Track sources" />
-      <Toggle checked={p.useConversationMemory} onChange={p.setUseConversationMemory} label="Memory" sub="Session history" />
-      <Toggle checked={p.useKnowledgeGraph} onChange={p.setUseKnowledgeGraph} label="Knowledge Graph" sub="Neo4j enrichment" />
-      <Toggle checked={p.includeSources} onChange={p.setIncludeSources} label="Return Sources" sub="Attach chunks" />
-    </div>
-    <div className="border-t border-border mt-3.5 pt-3.5">
-      <div className="font-mono text-[0.6rem] font-semibold tracking-[.12em] uppercase text-dim mb-2">Re-ranking</div>
-      <Toggle checked={p.useReranking} onChange={p.setUseReranking} label="Enable Re-ranking" />
-      {p.useReranking && <div className="mt-2.5"><div className="font-mono text-[0.6rem] font-semibold tracking-[.12em] uppercase text-dim mb-2">Strategy</div>
-        <select value={p.rerankStrategy} onChange={e => p.setRerankStrategy(e.target.value as RerankStrategy)}>
-          <option value="none">Hybrid (default)</option><option value="cross_encoder">Cross-encoder (listwise)</option><option value="llm_based">LLM-based</option>
-        </select>
-      </div>}
-    </div>
-    <div className="border-t border-border mt-3.5 pt-3.5">
-      <div className="font-mono text-[0.6rem] font-semibold tracking-[.12em] uppercase text-dim mb-2">Retrieval</div>
-      <RangeField label="Chunks" value={p.limit} onChange={p.setLimit} min={1} max={20} step={1} placeholder="6" />
-      <RangeField label="Score threshold" value={p.scoreThreshold} onChange={p.setScoreThreshold} min={0} max={1} step={0.05} fmt={v=>v.toFixed(2)} placeholder="off" />
-    </div>
-    <div className="border-t border-border mt-3.5 pt-3.5">
-      <div className="font-mono text-[0.6rem] font-semibold tracking-[.12em] uppercase text-dim mb-2">LLM Generation</div>
-      <RangeField label="Temperature" value={p.temperature} onChange={p.setTemperature} min={0} max={1} step={0.05} fmt={v=>v.toFixed(2)} placeholder="auto" />
-      <RangeField label="Top-p" value={p.topP} onChange={p.setTopP} min={0} max={1} step={0.05} fmt={v=>v.toFixed(2)} />
-      <RangeField label="Top-k" value={p.topK} onChange={p.setTopK} min={1} max={100} step={1} />
-      <RangeField label="Max tokens" value={p.maxTokens} onChange={p.setMaxTokens} min={100} max={8192} step={100} placeholder="auto" />
-    </div>
-  </div>
-);
+// interface PipelineProps {
+//   useHybridSearch:boolean;setUseHybridSearch:(v:boolean)=>void;
+//   useQueryTransformation:boolean;setUseQueryTransformation:(v:boolean)=>void;
+//   useContextualCompression:boolean;setUseContextualCompression:(v:boolean)=>void;
+//   useCitationTracking:boolean;setUseCitationTracking:(v:boolean)=>void;
+//   useConversationMemory:boolean;setUseConversationMemory:(v:boolean)=>void;
+//   useKnowledgeGraph:boolean;setUseKnowledgeGraph:(v:boolean)=>void;
+//   includeSources:boolean;setIncludeSources:(v:boolean)=>void;
+//   useReranking:boolean;setUseReranking:(v:boolean)=>void;
+//   rerankStrategy:RerankStrategy;setRerankStrategy:(v:RerankStrategy)=>void;
+//   limit:number|undefined;setLimit:(v:number|undefined)=>void;
+//   scoreThreshold:number|undefined;setScoreThreshold:(v:number|undefined)=>void;
+//   temperature:number|undefined;setTemperature:(v:number|undefined)=>void;
+//   topP:number|undefined;setTopP:(v:number|undefined)=>void;
+//   topK:number|undefined;setTopK:(v:number|undefined)=>void;
+//   maxTokens:number|undefined;setMaxTokens:(v:number|undefined)=>void;
+// }
+// const PipelinePanel: React.FC<PipelineProps> = (p) => (
+//   <div className="bg-surface border border-border rounded-xl p-[18px]">
+//     <div className="font-mono text-[0.6rem] font-semibold tracking-[.12em] uppercase text-dim mb-2">Pipeline</div>
+//     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
+//       <Toggle checked={p.useHybridSearch} onChange={p.setUseHybridSearch} label="Hybrid Search" sub="Vector + BM25" />
+//       <Toggle checked={p.useQueryTransformation} onChange={p.setUseQueryTransformation} label="Query Expansion" sub="Rephrase + expand" />
+//       <Toggle checked={p.useContextualCompression} onChange={p.setUseContextualCompression} label="Compression" sub="Extract relevant" />
+//       <Toggle checked={p.useCitationTracking} onChange={p.setUseCitationTracking} label="Citations" sub="Track sources" />
+//       <Toggle checked={p.useConversationMemory} onChange={p.setUseConversationMemory} label="Memory" sub="Session history" />
+//       <Toggle checked={p.useKnowledgeGraph} onChange={p.setUseKnowledgeGraph} label="Knowledge Graph" sub="Neo4j enrichment" />
+//       <Toggle checked={p.includeSources} onChange={p.setIncludeSources} label="Return Sources" sub="Attach chunks" />
+//     </div>
+//     <div className="border-t border-border mt-3.5 pt-3.5">
+//       <div className="font-mono text-[0.6rem] font-semibold tracking-[.12em] uppercase text-dim mb-2">Re-ranking</div>
+//       <Toggle checked={p.useReranking} onChange={p.setUseReranking} label="Enable Re-ranking" />
+//       {p.useReranking && <div className="mt-2.5"><div className="font-mono text-[0.6rem] font-semibold tracking-[.12em] uppercase text-dim mb-2">Strategy</div>
+//         <select value={p.rerankStrategy} onChange={e => p.setRerankStrategy(e.target.value as RerankStrategy)}>
+//           <option value="none">Hybrid (default)</option><option value="cross_encoder">Cross-encoder (listwise)</option><option value="llm_based">LLM-based</option>
+//         </select>
+//       </div>}
+//     </div>
+//     <div className="border-t border-border mt-3.5 pt-3.5">
+//       <div className="font-mono text-[0.6rem] font-semibold tracking-[.12em] uppercase text-dim mb-2">Retrieval</div>
+//       <RangeField label="Chunks" value={p.limit} onChange={p.setLimit} min={1} max={20} step={1} placeholder="6" />
+//       <RangeField label="Score threshold" value={p.scoreThreshold} onChange={p.setScoreThreshold} min={0} max={1} step={0.05} fmt={v=>v.toFixed(2)} placeholder="off" />
+//     </div>
+//     <div className="border-t border-border mt-3.5 pt-3.5">
+//       <div className="font-mono text-[0.6rem] font-semibold tracking-[.12em] uppercase text-dim mb-2">LLM Generation</div>
+//       <RangeField label="Temperature" value={p.temperature} onChange={p.setTemperature} min={0} max={1} step={0.05} fmt={v=>v.toFixed(2)} placeholder="auto" />
+//       <RangeField label="Top-p" value={p.topP} onChange={p.setTopP} min={0} max={1} step={0.05} fmt={v=>v.toFixed(2)} />
+//       <RangeField label="Top-k" value={p.topK} onChange={p.setTopK} min={1} max={100} step={1} />
+//       <RangeField label="Max tokens" value={p.maxTokens} onChange={p.setMaxTokens} min={100} max={8192} step={100} placeholder="auto" />
+//     </div>
+//   </div>
+// );
 
 // ─── Card / Label ─────────────────────────────────────────────
 const Card: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
@@ -681,21 +681,20 @@ const RagDemo: React.FC = () => {
   const [chunkingStrategy, setChunkingStrategy] = useState<ChunkingStrategy>('simple');
   const [enableKnowledgeGraph, setEnableKnowledgeGraph] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [useHybridSearch, setUseHybridSearch] = useState(true);
-  const [useReranking, setUseReranking] = useState(true);
-  const [rerankStrategy, setRerankStrategy] = useState<RerankStrategy>('none');
-  const [useQueryTransformation, setUseQueryTransformation] = useState(true);
-  const [useContextualCompression, setUseContextualCompression] = useState(false);
-  const [useConversationMemory, setUseConversationMemory] = useState(true);
-  const [useCitationTracking, setUseCitationTracking] = useState(true);
-  const [useKnowledgeGraph, setUseKnowledgeGraph] = useState(false);
-  const [includeSources, setIncludeSources] = useState(false);
-  const [limit, setLimit] = useState<number | undefined>(undefined);
-  const [scoreThreshold, setScoreThreshold] = useState<number | undefined>(undefined);
-  const [temperature, setTemperature] = useState<number | undefined>(undefined);
-  const [topP, setTopP] = useState<number | undefined>(undefined);
-  const [topK, setTopK] = useState<number | undefined>(undefined);
-  const [maxTokens, setMaxTokens] = useState<number | undefined>(undefined);
+  const [useHybridSearch] = useState(true);
+  const [useReranking] = useState(true);
+  const [rerankStrategy] = useState<RerankStrategy>('none');
+  const [useQueryTransformation] = useState(true);
+  const [useContextualCompression] = useState(false);
+  const [useConversationMemory] = useState(true);
+  const [useCitationTracking] = useState(true);
+  const [useKnowledgeGraph] = useState(false);
+  const [limit] = useState<number | undefined>(undefined);
+  const [scoreThreshold] = useState<number | undefined>(undefined);
+  const [temperature] = useState<number | undefined>(undefined);
+  const [topP] = useState<number | undefined>(undefined);
+  const [topK] = useState<number | undefined>(undefined);
+  const [maxTokens] = useState<number | undefined>(undefined);
   const [sessionId] = useState(`session_${Date.now()}`);
   const [retrievedImages, setRetrievedImages] = useState<ImageData[]>([]);
   const [allDocuments, setAllDocuments] = useState<DocumentData[]>([]);
@@ -850,7 +849,7 @@ const RagDemo: React.FC = () => {
 
   if (!isAuthed) return <LoginPage onLogin={() => setIsAuthed(true)} />;
 
-  const pp: PipelineProps = { useHybridSearch, setUseHybridSearch, useQueryTransformation, setUseQueryTransformation, useContextualCompression, setUseContextualCompression, useCitationTracking, setUseCitationTracking, useConversationMemory, setUseConversationMemory, useKnowledgeGraph, setUseKnowledgeGraph, includeSources, setIncludeSources, useReranking, setUseReranking, rerankStrategy, setRerankStrategy, limit, setLimit, scoreThreshold, setScoreThreshold, temperature, setTemperature, topP, setTopP, topK, setTopK, maxTokens, setMaxTokens };
+  //const pp: PipelineProps = { useHybridSearch, setUseHybridSearch, useQueryTransformation, setUseQueryTransformation, useContextualCompression, setUseContextualCompression, useCitationTracking, setUseCitationTracking, useConversationMemory, setUseConversationMemory, useKnowledgeGraph, setUseKnowledgeGraph, includeSources, setIncludeSources, useReranking, setUseReranking, rerankStrategy, setRerankStrategy, limit, setLimit, scoreThreshold, setScoreThreshold, temperature, setTemperature, topP, setTopP, topK, setTopK, maxTokens, setMaxTokens };
 
   const TABS: { id: UploadMode; label: string }[] = [
     { id: 'advanced-rag', label: 'Chat' }, 
