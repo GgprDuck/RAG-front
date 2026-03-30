@@ -9,7 +9,6 @@ import axios from 'axios';
 type UploadMode = 'knowledge' | 'images' | 'image-query' | 'all-images' | 'all-documents' | 'advanced-rag' | 'evaluation' | 'links';
 type RerankStrategy = 'llm_based' | 'cross_encoder' | 'none';
 type ChunkingStrategy = 'simple' | 'semantic' | 'parent-child';
-type ImageData = { id: string; s3Url: string; description?: string; score?: number; keywords?: string[] };
 type DocumentData = { id: string; text: string; createdAt?: string; model?: string };
 type Citation = { id: string; documentId: string; text: string };
 type SourceDoc = { id: string; text: string; score?: number; metadata?: Record<string, any> };
@@ -462,7 +461,6 @@ const RagDemo: React.FC = () => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [folderFiles, setFolderFiles] = useState<File[]>([]);
-  const [images, setImages] = useState<File[]>([]);
   const [chunkingStrategy, setChunkingStrategy] = useState<ChunkingStrategy>('simple');
   const [enableKnowledgeGraph, setEnableKnowledgeGraph] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -481,10 +479,9 @@ const RagDemo: React.FC = () => {
   const [topK] = useState<number | undefined>(undefined);
   const [maxTokens] = useState<number | undefined>(undefined);
   const [sessionId] = useState(`session_${Date.now()}`);
-  const [retrievedImages, setRetrievedImages] = useState<ImageData[]>([]);
   const [allDocuments, setAllDocuments] = useState<DocumentData[]>([]);
   const [evalResults, setEvalResults] = useState<any>(null);
-  const [generatedImage, setGeneratedImage] = useState<string | null>(null);
+  const [generatedImage, _setGeneratedImage] = useState<string | null>(null);
   const [lightboxImg, setLightboxImg] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -593,9 +590,6 @@ const RagDemo: React.FC = () => {
     if (!linkIndexFiles.length) return err('No .md files selected');
     const fd = new FormData();
     linkIndexFiles.forEach(f => {
-      // Preserve the full relative path (e.g. "vault/notes/api.md") so the
-      // backend can use it as the sourceFile key. Falls back to bare filename
-      // when files were picked individually rather than via folder picker.
       const name = (f as any).webkitRelativePath || f.name;
       fd.append('files', f, name);
     });
@@ -690,39 +684,27 @@ const RagDemo: React.FC = () => {
     const fd = new FormData(); fd.append('file', file); fd.append('chunkingStrategy', chunkingStrategy); fd.append('enableKnowledgeGraph', enableKnowledgeGraph.toString());
     try { setBusy(true); inf('Uploading…'); const r = await axios.post(`${API}/rag/documents/upload`, fd); ok(`${r.data.data?.chunks || 0} chunks · ${chunkingStrategy}`); setFile(null); } catch (e: any) { err(e.response?.data?.message || e.message); } finally { setBusy(false); }
   };
+
   const handleUploadFolder = async () => {
     if (!folderFiles.length) return err('No markdown files selected.');
     const fd = new FormData(); folderFiles.forEach(f => fd.append('files', f)); fd.append('chunkingStrategy', chunkingStrategy); fd.append('enableKnowledgeGraph', enableKnowledgeGraph.toString());
     try { setBusy(true); inf('Uploading folder…'); const r = await axios.post(`${API}/rag/documents/upload-folder`, fd); ok(`${r.data.data.filesProcessed} files → ${r.data.data.totalChunks} chunks`); setFolderFiles([]); } catch (e: any) { err(e.response?.data?.message || e.message); } finally { setBusy(false); }
   };
-  const handleUploadImages = async () => {
-    if (!images.length) return err('Choose images.');
-    const fd = new FormData(); images.forEach(img => fd.append('images', img));
-    try { setBusy(true); inf('Uploading…'); const r = await axios.post(`${API}/rag/images/upload`, fd); ok(`${r.data.data?.imagesUploaded || 0} uploaded`); setImages([]); if (r.data.data?.generatedImage) setGeneratedImage(`data:image/png;base64,${r.data.data.generatedImage}`); } catch (e: any) { err(e.response?.data?.message || e.message); } finally { setBusy(false); }
-  };
-  const handleImageSearch = async () => {
-    if (!question.trim()) return;
-    try { setBusy(true); inf('Searching…'); const r = await axios.get(`${API}/rag/images/search`, { params: { query: question, limit: 10 } }); setRetrievedImages(r.data.data); ok(`${r.data.data.length} result(s)`); } catch (e: any) { err(e.message); } finally { setBusy(false); }
-  };
-  const handleRetrieveAllImages = async () => {
-    try { setBusy(true); const r = await axios.get(`${API}/rag/images`); setRetrievedImages(r.data.data); ok(`${r.data.data.length} image(s)`); } catch (e: any) { err(e.message); } finally { setBusy(false); }
-  };
+
   const handleRetrieveAllDocuments = async () => {
     try { setBusy(true); const r = await axios.get(`${API}/rag/documents`); setAllDocuments(r.data.data); ok(`${r.data.data.length} doc(s)`); } catch (e: any) { err(e.message); } finally { setBusy(false); }
   };
-  const handleDeleteImage = async (id: string) => {
-    try { setBusy(true); await axios.delete(`${API}/rag/images/${id}`); setRetrievedImages(p => p.filter(i => i.id !== id)); ok('Deleted'); } catch (e: any) { err(e.message); } finally { setBusy(false); }
-  };
+
   const handleDeleteDoc = async (id: string) => {
     try { setBusy(true); await axios.delete(`${API}/rag/documents/${id}`); setAllDocuments(p => p.filter(d => d.id !== id)); ok('Deleted'); } catch (e: any) { err(e.message); } finally { setBusy(false); }
   };
+
   const handleEvaluate = async () => {
     if (!question.trim()) return err('Enter queries');
     try { setBusy(true); inf('Evaluating…'); const queries = question.split('\n').filter(q => q.trim()).map(q => ({ query: q.trim() })); const r = await axios.post(`${API}/rag/documents/evaluate`, { testQueries: queries }); setEvalResults(r.data.data); ok('Done'); } catch (e: any) { err(e.message); } finally { setBusy(false); }
   };
 
   useEffect(() => {
-    if (mode === 'all-images') handleRetrieveAllImages();
     if (mode === 'all-documents') handleRetrieveAllDocuments();
   }, [mode]);
 
@@ -1128,9 +1110,7 @@ const RagDemo: React.FC = () => {
                       <span className="ml-auto font-mono text-[0.58rem] text-dim">.md only · max 200 files</span>
                     </div>
                     <div className="p-5 flex flex-col gap-3">
-                      {/* Two pickers */}
                       <div className="flex flex-col gap-2">
-                        {/* Folder picker */}
                         <label className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-border2 bg-surface2 hover:border-border cursor-pointer transition-all duration-150">
                           <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 3.5h10v7a.5.5 0 0 1-.5.5h-9a.5.5 0 0 1-.5-.5v-7z" stroke="currentColor" strokeWidth="1.2" className="text-muted"/><path d="M1 3.5V2.5a.5.5 0 0 1 .5-.5H4l.8 1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" className="text-muted"/></svg>
                           <span className="font-mono text-[0.65rem] text-muted flex-1">Folder picker</span>
@@ -1138,7 +1118,6 @@ const RagDemo: React.FC = () => {
                           <input type="file" className="hidden" {...{ webkitdirectory: '', directory: '' } as any} multiple
                             onChange={e => { if (e.target.files) { const md = Array.from(e.target.files).filter(f => f.name.endsWith('.md')); setLinkIndexFiles(md); md.length ? ok(`${md.length} .md files from folder`) : err('No .md files in that folder'); } }} />
                         </label>
-                        {/* Multi-select */}
                         <label className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-border2 bg-surface2 hover:border-border cursor-pointer transition-all duration-150">
                           <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 10h8M6 2v6M4 5l2-2.5L8 5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" className="text-muted"/></svg>
                           <span className="font-mono text-[0.65rem] text-muted flex-1">Multi-select .md</span>
