@@ -1,7 +1,7 @@
 import {
   useState, useEffect, useRef, useCallback
 } from 'react';
-/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import React from 'react';
 import { flushSync } from 'react-dom';
 import axios from 'axios';
@@ -11,8 +11,19 @@ type RerankStrategy = 'llm_based' | 'cross_encoder' | 'none';
 type ChunkingStrategy = 'simple' | 'semantic' | 'parent-child';
 type DocumentData = { id: string; text: string; createdAt?: string; model?: string };
 type Citation = { id: string; documentId: string; text: string };
-type SourceDoc = { id: string; text: string; score?: number; metadata?: Record<string, any> };
-type StreamMeta = { citations: Citation[]; images: string[]; confidence?: number; relevantChunks: number; queryType?: 'entity' | 'factual' | 'wide'; queryConfidence?: number; generationParams?: any; sources?: SourceDoc[] };
+type SourceDoc = { id: string; text: string; score?: number; metadata?: Record<string, unknown> };
+type RetrievalDiagnostics = {
+  effectiveLimit?: number;
+  preFilterCount?: number;
+  postFilterCount?: number;
+  finalCount?: number;
+  searchMode?: 'precise' | 'wide' | 'balanced' | 'entity';
+  hybridEnabled?: boolean;
+  rerankEnabled?: boolean;
+  contextualCompressionEnabled?: boolean;
+  cacheHit?: boolean;
+};
+type StreamMeta = { citations: Citation[]; images: string[]; confidence?: number; relevantChunks: number; queryType?: 'entity' | 'factual' | 'wide'; queryConfidence?: number; generationParams?: unknown; sources?: SourceDoc[]; retrievalDiagnostics?: RetrievalDiagnostics };
 type StreamChunkEvent =
   | { event: 'metadata';   metadata: Partial<StreamMeta> & { conversationContext?: boolean } }
   | { event: 'sources';    sources: SourceDoc[] }
@@ -25,6 +36,25 @@ type ChatMessage = { role: 'user' | 'assistant'; content: string; meta?: StreamM
 type Chat = { sessionId: string; firstMessage: string; lastActivity: string | Date; turnCount: number; messages?: ChatMessage[] };
 type Toast = { id: number; text: string; type: 'ok' | 'err' | 'info' };
 type LinkRecord = { id?: string; sourceFile: string; url: string; title?: string; description?: string };
+type ApiError = { response?: { data?: { message?: string } }; message?: string; name?: string };
+type EvalResults = {
+  averageMetrics: {
+    contextRelevance: number;
+    answerFaithfulness: number;
+    answerRelevance: number;
+    overall: number;
+  };
+  summary?: {
+    totalQueries: number;
+    answeredQueries: number;
+    avgChunksRetrieved?: number;
+  };
+};
+
+const getErrorMessage = (error: unknown, fallback = 'Request failed') => {
+  const e = error as ApiError;
+  return e.response?.data?.message || e.message || fallback;
+};
 
 const API = import.meta.env.VITE_API_URL;
 const AUTH_USER = import.meta.env.VITE_AUTH_USER;
@@ -226,7 +256,7 @@ const MobileDrawer: React.FC<{
               <div key={label}>
                 <div className="font-mono text-[0.6rem] tracking-[.1em] uppercase text-dim px-1.5 pt-2.5 pb-1">{label}</div>
                 {gc.map(chat => (
-                  <div key={chat.sessionId} onClick={() => { renamingId !== chat.sessionId && onSelect(chat.sessionId); onClose(); }} onDoubleClick={e => startRename(chat, e)}
+                  <div key={chat.sessionId} onClick={() => { if (renamingId !== chat.sessionId) onSelect(chat.sessionId); onClose(); }} onDoubleClick={e => startRename(chat, e)}
                     className={`px-2.5 py-[7px] cursor-pointer flex items-center gap-2 transition-all duration-150 border-l-2 rounded-lg mb-0.5 group ${activeChatId === chat.sessionId ? 'bg-accent-bg border-l-accent' : 'border-l-transparent hover:bg-surface2'}`}>
                     {renamingId === chat.sessionId
                       ? <input autoFocus value={renameVal} onChange={e => setRenameVal(e.target.value)} onBlur={() => commitRename(chat.sessionId)} onKeyDown={e => { if (e.key === 'Enter') commitRename(chat.sessionId); if (e.key === 'Escape') setRenamingId(null); }} onClick={e => e.stopPropagation()} className="flex-1 bg-surface border border-accent rounded-[5px] text-text font-sans text-[0.78rem] py-0.5 px-1.5 outline-none min-w-0" />
@@ -382,6 +412,21 @@ const MessageBubble: React.FC<{ msg: ChatMessage; onLightbox: (url: string) => v
             ))}
           </div>
         )}
+        {msg.meta?.retrievalDiagnostics && (
+          <div className="mt-3 pt-3 border-t border-border">
+            <div className="font-mono text-[0.6rem] font-semibold tracking-[.12em] uppercase text-dim mb-2">Retrieval Diagnostics</div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+              {msg.meta.retrievalDiagnostics.searchMode && <Tag>{msg.meta.retrievalDiagnostics.searchMode}</Tag>}
+              {msg.meta.retrievalDiagnostics.cacheHit !== undefined && <Tag color={msg.meta.retrievalDiagnostics.cacheHit ? 'green' : 'orange'}>{msg.meta.retrievalDiagnostics.cacheHit ? 'cache hit' : 'cache miss'}</Tag>}
+              {msg.meta.retrievalDiagnostics.preFilterCount !== undefined && <Tag>{msg.meta.retrievalDiagnostics.preFilterCount} pre</Tag>}
+              {msg.meta.retrievalDiagnostics.postFilterCount !== undefined && <Tag>{msg.meta.retrievalDiagnostics.postFilterCount} post</Tag>}
+              {msg.meta.retrievalDiagnostics.finalCount !== undefined && <Tag>{msg.meta.retrievalDiagnostics.finalCount} final</Tag>}
+              {msg.meta.retrievalDiagnostics.effectiveLimit !== undefined && <Tag>limit {msg.meta.retrievalDiagnostics.effectiveLimit}</Tag>}
+              {msg.meta.retrievalDiagnostics.hybridEnabled !== undefined && <Tag color={msg.meta.retrievalDiagnostics.hybridEnabled ? 'green' : 'red'}>{msg.meta.retrievalDiagnostics.hybridEnabled ? 'hybrid' : 'vector only'}</Tag>}
+              {msg.meta.retrievalDiagnostics.rerankEnabled !== undefined && <Tag color={msg.meta.retrievalDiagnostics.rerankEnabled ? 'green' : 'orange'}>{msg.meta.retrievalDiagnostics.rerankEnabled ? 'rerank on' : 'rerank off'}</Tag>}
+            </div>
+          </div>
+        )}
         {(msg.isCorrected || msg.meta?.queryType || msg.meta?.confidence !== undefined || msg.meta?.relevantChunks !== undefined) && (
           <div className="flex gap-1 flex-wrap mt-2.5">
             {msg.isCorrected && <Tag color="red">hallucination filtered</Tag>}
@@ -439,7 +484,7 @@ const Label = ({ children }: { children: React.ReactNode }) => (
   <div className="font-mono text-[0.6rem] font-semibold tracking-[.12em] uppercase text-dim mb-2">{children}</div>
 );
 
-// ─── Main ─────────────────────────────────────────────────────
+
 const RagDemo: React.FC = () => {
   const [isAuthed, setIsAuthed] = useState(() => checkAuth());
   const [mode, setMode] = useState<UploadMode>('advanced-rag');
@@ -468,9 +513,11 @@ const RagDemo: React.FC = () => {
   const [useReranking] = useState(true);
   const [rerankStrategy] = useState<RerankStrategy>('none');
   const [useQueryTransformation] = useState(true);
-  const [useContextualCompression] = useState(false);
+  const useContextualCompression = true;
   const [useConversationMemory] = useState(true);
-  const [useCitationTracking] = useState(true);
+  const useCitationTracking = true;
+  const includeRetrievalDiagnostics = true;
+  const useAnswerCache = true;
   const [useKnowledgeGraph] = useState(false);
   const [limit] = useState<number | undefined>(undefined);
   const [scoreThreshold] = useState<number | undefined>(undefined);
@@ -478,14 +525,13 @@ const RagDemo: React.FC = () => {
   const [topP] = useState<number | undefined>(undefined);
   const [topK] = useState<number | undefined>(undefined);
   const [maxTokens] = useState<number | undefined>(undefined);
-  const [sessionId] = useState(`session_${Date.now()}`);
   const [allDocuments, setAllDocuments] = useState<DocumentData[]>([]);
-  const [evalResults, setEvalResults] = useState<any>(null);
-  const [generatedImage, _setGeneratedImage] = useState<string | null>(null);
+  const [evalResults, setEvalResults] = useState<EvalResults | null>(null);
+  const [generatedImage] = useState<string | null>(null);
   const [lightboxImg, setLightboxImg] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  // ── Links state ──────────────────────────────────────────────
+  
   const [links, setLinks] = useState<LinkRecord[]>([]);
   const [linkSourceFilter, setLinkSourceFilter] = useState('');
   const [linkQuery, setLinkQuery] = useState('');
@@ -522,7 +568,7 @@ const RagDemo: React.FC = () => {
 
   const fetchChats = useCallback(async () => {
     try { setChatsLoading(true); const r = await axios.get(`${API}/rag/chats`); setChats(r.data.data ?? []); }
-    catch { /* silent */ } finally { setChatsLoading(false); }
+    catch { setChats([]); } finally { setChatsLoading(false); }
   }, []);
 
   useEffect(() => { fetchChats(); }, [fetchChats]);
@@ -531,7 +577,7 @@ const RagDemo: React.FC = () => {
     if (textareaRef.current) { textareaRef.current.style.height = 'auto'; textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 180) + 'px'; }
   }, [question]);
 
-  // ── Links handlers ───────────────────────────────────────────
+  
   const handleFetchLinks = useCallback(async () => {
     try {
       setLinksLoading(true);
@@ -540,13 +586,13 @@ const RagDemo: React.FC = () => {
       const r = await axios.get(`${API}/links`, { params });
       setLinks(r.data.links ?? []);
       ok(`${r.data.total} link(s) loaded`);
-    } catch (e: any) {
-      err(e.response?.data?.message || e.message);
+    } catch (e: unknown) {
+      err(getErrorMessage(e));
     } finally {
       setLinksLoading(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [linkSourceFilter]);
+
+  }, [linkSourceFilter, ok, err]);
 
   const handleSearchLinks = async () => {
     if (!linkQuery.trim()) return err('"q" is required');
@@ -555,8 +601,8 @@ const RagDemo: React.FC = () => {
       const r = await axios.get(`${API}/links/search`, { params: { q: linkQuery.trim() } });
       setLinkQueryResult(r.data);
       ok(`${r.data.total} result(s)`);
-    } catch (e: any) {
-      err(e.response?.data?.message || e.message);
+    } catch (e: unknown) {
+      err(getErrorMessage(e));
     } finally { setLinksLoading(false); }
   };
 
@@ -567,8 +613,8 @@ const RagDemo: React.FC = () => {
       const r = await axios.get(`${API}/links/query`, { params: { q: linkQuery.trim() } });
       setLinkQueryResult(r.data);
       ok(`${r.data.total} result(s)`);
-    } catch (e: any) {
-      err(e.response?.data?.message || e.message);
+    } catch (e: unknown) {
+      err(getErrorMessage(e));
     } finally { setLinksLoading(false); }
   };
 
@@ -581,8 +627,8 @@ const RagDemo: React.FC = () => {
       ok(`Deleted links for "${source}"`);
       if (!sourceOverride) setLinkDeleteSource('');
       setLinks(prev => prev.filter(l => l.sourceFile !== source));
-    } catch (e: any) {
-      err(e.response?.data?.message || e.message);
+    } catch (e: unknown) {
+      err(getErrorMessage(e));
     } finally { setLinksLoading(false); }
   };
 
@@ -590,7 +636,7 @@ const RagDemo: React.FC = () => {
     if (!linkIndexFiles.length) return err('No .md files selected');
     const fd = new FormData();
     linkIndexFiles.forEach(f => {
-      const name = (f as any).webkitRelativePath || f.name;
+      const name = ((f as File & { webkitRelativePath?: string }).webkitRelativePath) || f.name;
       fd.append('files', f, name);
     });
     try {
@@ -598,15 +644,15 @@ const RagDemo: React.FC = () => {
       const r = await axios.post(`${API}/links/index-links`, fd);
       ok(`${r.data.filesProcessed} file(s) → ${r.data.linksIndexed} link(s)`);
       setLinkIndexFiles([]);
-    } catch (e: any) {
-      err(e.response?.data?.message || e.message);
+    } catch (e: unknown) {
+      err(getErrorMessage(e));
     } finally { setBusy(false); }
   };
 
   useEffect(() => {
     if (mode === 'links' && linkMode === 'view') handleFetchLinks();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, linkMode]);
+    
+  }, [mode, linkMode, handleFetchLinks]);
 
   const createNewChat = useCallback(() => {
     const sid = `session_${Date.now()}`;
@@ -618,8 +664,8 @@ const RagDemo: React.FC = () => {
 
   const deleteChat = useCallback(async (sid: string) => {
     try { await axios.delete(`${API}/rag/chats/${sid}`); setChats(prev => { const next = prev.filter(c => c.sessionId !== sid); if (activeChatId === sid) setActiveChatId(next.length ? next[0].sessionId : null); return next; }); }
-    catch (e: any) { err(e.message); }
-  }, [activeChatId]);
+    catch (e: unknown) { err(getErrorMessage(e)); }
+  }, [activeChatId, err]);
 
   const renameChat = useCallback((sid: string, name: string) => { setChats(prev => prev.map(c => c.sessionId === sid ? { ...c, firstMessage: name } : c)); }, []);
 
@@ -632,7 +678,9 @@ const RagDemo: React.FC = () => {
       const messages: ChatMessage[] = [];
       for (const t of turns) { const ts = t.timestamp ? new Date(t.timestamp).getTime() : Date.now(); messages.push({ role: 'user', content: t.query, timestamp: ts }); messages.push({ role: 'assistant', content: t.answer, timestamp: ts + 1 }); }
       setChats(prev => prev.map(c => c.sessionId === sid ? { ...c, messages } : c));
-    } catch {}
+    } catch {
+      return;
+    }
   }, [mode]);
 
   const conversationHistory = (activeChat?.messages ?? []).map(m => ({ role: m.role, content: m.content }));
@@ -651,7 +699,7 @@ const RagDemo: React.FC = () => {
     abortRef.current?.abort();
     const ctrl = new AbortController(); abortRef.current = ctrl; accumulatedRef.current = '';
     flushSync(() => { setStreamText(''); setStreamMeta(null); setIsCorrected(false); setIsStreaming(true); });
-    const body = { question: q, rerankStrategy, includeSources: true, limit, scoreThreshold, temperature, topP, topK, maxTokens, conversationHistory: useConversationMemory ? conversationHistory : undefined, options: { useHybridSearch, useReranking, useQueryTransformation, useContextualCompression, useConversationMemory, sessionId: chatId, useCitationTracking, useKnowledgeGraph } };
+    const body = { question: q, rerankStrategy, includeSources: true, limit, scoreThreshold, temperature, topP, topK, maxTokens, conversationHistory: useConversationMemory ? conversationHistory : undefined, options: { useHybridSearch, useReranking, useQueryTransformation, useContextualCompression, useConversationMemory, sessionId: chatId, useCitationTracking, includeRetrievalDiagnostics, useAnswerCache, useKnowledgeGraph } };
     let finalMeta: StreamMeta | null = null; let finalCorrected = false;
     try {
       const res = await fetch(`${API}/rag/documents/ask/stream`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: ctrl.signal });
@@ -668,45 +716,45 @@ const RagDemo: React.FC = () => {
           case 'error': flushSync(() => setStreamText(`⚠ ${chunk.error}`)); break;
         }
       };
-      while (true) { const { done, value } = await reader.read(); if (done) break; tail += decoder.decode(value, { stream: true }); const msgs = tail.split('\n\n'); tail = msgs.pop() ?? ''; for (const msg of msgs) { if (!msg.trim()) continue; let d = ''; for (const line of msg.split('\n')) { if (line.startsWith('data: ')) d += line.slice(6); } if (!d.trim()) continue; try { dispatch(JSON.parse(d) as StreamChunkEvent); } catch {} } }
-    } catch (e: any) { if (e.name !== 'AbortError') flushSync(() => setStreamText(`⚠ Stream error: ${e.message}`)); }
+      while (true) { const { done, value } = await reader.read(); if (done) break; tail += decoder.decode(value, { stream: true }); const msgs = tail.split('\n\n'); tail = msgs.pop() ?? ''; for (const msg of msgs) { if (!msg.trim()) continue; let d = ''; for (const line of msg.split('\n')) { if (line.startsWith('data: ')) d += line.slice(6); } if (!d.trim()) continue; try { dispatch(JSON.parse(d) as StreamChunkEvent); } catch { continue; } } }
+    } catch (e: unknown) { if ((e as ApiError).name !== 'AbortError') flushSync(() => setStreamText(`⚠ Stream error: ${getErrorMessage(e)}`)); }
     finally {
       const fc = accumulatedRef.current;
       if (fc) { setChats(prev => prev.map(c => c.sessionId === chatId ? { ...c, messages: [...(c.messages ?? []), { role: 'assistant', content: fc, meta: finalMeta, isCorrected: finalCorrected, timestamp: Date.now() }] } : c)); setChats(prev => prev.map(c => c.sessionId === chatId ? { ...c, turnCount: (c.turnCount ?? 0) + 1, firstMessage: q.slice(0, 60), lastActivity: new Date() } : c)); }
       setStreamText(''); setStreamMeta(null); setIsStreaming(false);
     }
-  }, [question, isStreaming, rerankStrategy, limit, scoreThreshold, temperature, topP, topK, maxTokens, conversationHistory, useHybridSearch, useReranking, useQueryTransformation, useContextualCompression, useConversationMemory, sessionId, useCitationTracking, useKnowledgeGraph, activeChatId]);
+  }, [question, isStreaming, rerankStrategy, limit, scoreThreshold, temperature, topP, topK, maxTokens, conversationHistory, useHybridSearch, useReranking, useQueryTransformation, useContextualCompression, useConversationMemory, useCitationTracking, includeRetrievalDiagnostics, useAnswerCache, useKnowledgeGraph, activeChatId]);
 
   const handleStopStream = () => { abortRef.current?.abort(); setIsStreaming(false); };
 
   const handleUploadKnowledge = async () => {
     if (!file) return err('Choose a file.');
     const fd = new FormData(); fd.append('file', file); fd.append('chunkingStrategy', chunkingStrategy); fd.append('enableKnowledgeGraph', enableKnowledgeGraph.toString());
-    try { setBusy(true); inf('Uploading…'); const r = await axios.post(`${API}/rag/documents/upload`, fd); ok(`${r.data.data?.chunks || 0} chunks · ${chunkingStrategy}`); setFile(null); } catch (e: any) { err(e.response?.data?.message || e.message); } finally { setBusy(false); }
+    try { setBusy(true); inf('Uploading…'); const r = await axios.post(`${API}/rag/documents/upload`, fd); ok(`${r.data.data?.chunks || 0} chunks · ${chunkingStrategy}`); setFile(null); } catch (e: unknown) { err(getErrorMessage(e)); } finally { setBusy(false); }
   };
 
   const handleUploadFolder = async () => {
     if (!folderFiles.length) return err('No markdown files selected.');
     const fd = new FormData(); folderFiles.forEach(f => fd.append('files', f)); fd.append('chunkingStrategy', chunkingStrategy); fd.append('enableKnowledgeGraph', enableKnowledgeGraph.toString());
-    try { setBusy(true); inf('Uploading folder…'); const r = await axios.post(`${API}/rag/documents/upload-folder`, fd); ok(`${r.data.data.filesProcessed} files → ${r.data.data.totalChunks} chunks`); setFolderFiles([]); } catch (e: any) { err(e.response?.data?.message || e.message); } finally { setBusy(false); }
+    try { setBusy(true); inf('Uploading folder…'); const r = await axios.post(`${API}/rag/documents/upload-folder`, fd); ok(`${r.data.data.filesProcessed} files → ${r.data.data.totalChunks} chunks`); setFolderFiles([]); } catch (e: unknown) { err(getErrorMessage(e)); } finally { setBusy(false); }
   };
 
-  const handleRetrieveAllDocuments = async () => {
-    try { setBusy(true); const r = await axios.get(`${API}/rag/documents`); setAllDocuments(r.data.data); ok(`${r.data.data.length} doc(s)`); } catch (e: any) { err(e.message); } finally { setBusy(false); }
-  };
+  const handleRetrieveAllDocuments = useCallback(async () => {
+    try { setBusy(true); const r = await axios.get(`${API}/rag/documents`); setAllDocuments(r.data.data); ok(`${r.data.data.length} doc(s)`); } catch (e: unknown) { err(getErrorMessage(e)); } finally { setBusy(false); }
+  }, [ok, err]);
 
   const handleDeleteDoc = async (id: string) => {
-    try { setBusy(true); await axios.delete(`${API}/rag/documents/${id}`); setAllDocuments(p => p.filter(d => d.id !== id)); ok('Deleted'); } catch (e: any) { err(e.message); } finally { setBusy(false); }
+    try { setBusy(true); await axios.delete(`${API}/rag/documents/${id}`); setAllDocuments(p => p.filter(d => d.id !== id)); ok('Deleted'); } catch (e: unknown) { err(getErrorMessage(e)); } finally { setBusy(false); }
   };
 
   const handleEvaluate = async () => {
     if (!question.trim()) return err('Enter queries');
-    try { setBusy(true); inf('Evaluating…'); const queries = question.split('\n').filter(q => q.trim()).map(q => ({ query: q.trim() })); const r = await axios.post(`${API}/rag/documents/evaluate`, { testQueries: queries }); setEvalResults(r.data.data); ok('Done'); } catch (e: any) { err(e.message); } finally { setBusy(false); }
+    try { setBusy(true); inf('Evaluating…'); const queries = question.split('\n').filter(q => q.trim()).map(q => ({ query: q.trim() })); const r = await axios.post(`${API}/rag/documents/evaluate`, { testQueries: queries }); setEvalResults(r.data.data); ok('Done'); } catch (e: unknown) { err(getErrorMessage(e)); } finally { setBusy(false); }
   };
 
   useEffect(() => {
     if (mode === 'all-documents') handleRetrieveAllDocuments();
-  }, [mode]);
+  }, [mode, handleRetrieveAllDocuments]);
 
   const handleLogout = () => { clearAuth(); setIsAuthed(false); };
 
@@ -732,7 +780,7 @@ const RagDemo: React.FC = () => {
         </div>
       )}
 
-      {/* Nav */}
+      {}
       <nav className="h-[46px] bg-surface border-b border-border flex items-center px-3 sm:px-4 flex-shrink-0 overflow-x-hidden sticky top-0 z-50 gap-1">
         {mode === 'advanced-rag' && (
           <button onClick={() => setDrawerOpen(true)} className="md:hidden w-8 h-8 flex items-center justify-center rounded-lg border border-border2 bg-surface2 text-muted cursor-pointer flex-shrink-0 mr-1">
@@ -760,7 +808,7 @@ const RagDemo: React.FC = () => {
         </div>
       </nav>
 
-      {/* Chat */}
+      {}
       {mode === 'advanced-rag' && (
         <div className="flex-1 flex overflow-hidden">
           <ChatSidebar chats={chats} activeChatId={activeChatId} onSelect={selectChat} onNew={createNewChat} onDelete={deleteChat} onRename={renameChat} loading={chatsLoading} />
@@ -806,7 +854,7 @@ const RagDemo: React.FC = () => {
       {mode !== 'advanced-rag' && (
         <main key={mode} className="animate-tab-fade flex-1 overflow-auto p-3 sm:p-5 sm:px-7 max-w-[1140px] w-full mx-auto self-stretch">
 
-          {/* ── Knowledge ── */}
+          {}
           {mode === 'knowledge' && (
             <div className="max-w-[860px] mx-auto w-full flex flex-col gap-6">
               <div className="flex items-center gap-3 pt-1">
@@ -865,7 +913,7 @@ const RagDemo: React.FC = () => {
                       <label className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-border2 bg-surface2 hover:border-border cursor-pointer transition-all duration-150">
                         <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 3.5h10v7a.5.5 0 0 1-.5.5h-9a.5.5 0 0 1-.5-.5v-7z" stroke="currentColor" strokeWidth="1.2" className="text-muted"/><path d="M1 3.5V2.5a.5.5 0 0 1 .5-.5H4l.8 1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" className="text-muted"/></svg>
                         <span className="font-mono text-[0.65rem] text-muted flex-1">Folder picker</span><span className="font-mono text-[0.55rem] text-dim">Chrome/Edge</span>
-                        <input type="file" className="hidden" {...{ webkitdirectory: '', directory: '' } as any} multiple onChange={e => { if (e.target.files) { const md = Array.from(e.target.files).filter(f => f.name.endsWith('.md')); setFolderFiles(md); md.length ? ok(`${md.length} .md files`) : err('No .md files'); } }} />
+                        <input type="file" className="hidden" {...({ webkitdirectory: '', directory: '' } as unknown as Record<string, string>)} multiple onChange={e => { if (e.target.files) { const md = Array.from(e.target.files).filter(f => f.name.endsWith('.md')); setFolderFiles(md); if (md.length) ok(`${md.length} .md files`); else err('No .md files'); } }} />
                       </label>
                       <label className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-border2 bg-surface2 hover:border-border cursor-pointer transition-all duration-150">
                         <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 10h8M6 2v6M4 5l2-2.5L8 5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" className="text-muted"/></svg>
@@ -881,7 +929,7 @@ const RagDemo: React.FC = () => {
             </div>
           )}
 
-          {/* ── All Documents ── */}
+          {}
           {mode === 'all-documents' && (
             <div className="max-w-[860px] mx-auto w-full flex flex-col gap-5">
               <div className="flex items-center justify-between pt-1">
@@ -927,7 +975,7 @@ const RagDemo: React.FC = () => {
             </div>
           )}
 
-          {/* ── Evaluation ── */}
+          {}
           {mode === 'evaluation' && (
             <div className="max-w-full sm:max-w-[700px]">
               <Card>
@@ -962,11 +1010,11 @@ const RagDemo: React.FC = () => {
             <div className="text-center mt-6"><Label>Generated Image</Label><img src={generatedImage} alt="Generated" className="max-w-full rounded-xl border border-border" /></div>
           )}
 
-          {/* ── Links ── */}
+          {}
           {mode === 'links' && (
             <div className="max-w-[860px] mx-auto w-full flex flex-col gap-5">
 
-              {/* Header */}
+              {}
               <div className="flex items-center gap-3 pt-1">
                 <div className="w-9 h-9 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center flex-shrink-0">
                   <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
@@ -981,7 +1029,7 @@ const RagDemo: React.FC = () => {
                 </div>
               </div>
 
-              {/* Sub-tab strip */}
+              {}
               <div className="flex gap-1 bg-surface2 border border-border rounded-xl p-1 w-fit">
                 {(['view', 'search', 'query', 'index'] as const).map(t => (
                   <button key={t} onClick={() => { setLinkMode(t); setLinkQueryResult(null); }}
@@ -991,7 +1039,7 @@ const RagDemo: React.FC = () => {
                 ))}
               </div>
 
-              {/* View */}
+              {}
               {linkMode === 'view' && (
                 <div className="flex flex-col gap-4">
                   <div className="bg-surface border border-border rounded-2xl p-4 flex flex-col sm:flex-row gap-3 flex-wrap">
@@ -1045,7 +1093,7 @@ const RagDemo: React.FC = () => {
                 </div>
               )}
 
-              {/* Search / Query */}
+              {}
               {(linkMode === 'search' || linkMode === 'query') && (
                 <div className="flex flex-col gap-4">
                   <div className="bg-surface border border-border rounded-2xl p-5 flex flex-col gap-3">
@@ -1100,7 +1148,7 @@ const RagDemo: React.FC = () => {
                 </div>
               )}
 
-              {/* Index */}
+              {}
               {linkMode === 'index' && (
                 <div className="flex flex-col gap-4">
                   <div className="bg-surface border border-border rounded-2xl overflow-hidden">
@@ -1115,8 +1163,8 @@ const RagDemo: React.FC = () => {
                           <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 3.5h10v7a.5.5 0 0 1-.5.5h-9a.5.5 0 0 1-.5-.5v-7z" stroke="currentColor" strokeWidth="1.2" className="text-muted"/><path d="M1 3.5V2.5a.5.5 0 0 1 .5-.5H4l.8 1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" className="text-muted"/></svg>
                           <span className="font-mono text-[0.65rem] text-muted flex-1">Folder picker</span>
                           <span className="font-mono text-[0.55rem] text-dim">Chrome / Edge</span>
-                          <input type="file" className="hidden" {...{ webkitdirectory: '', directory: '' } as any} multiple
-                            onChange={e => { if (e.target.files) { const md = Array.from(e.target.files).filter(f => f.name.endsWith('.md')); setLinkIndexFiles(md); md.length ? ok(`${md.length} .md files from folder`) : err('No .md files in that folder'); } }} />
+                          <input type="file" className="hidden" {...({ webkitdirectory: '', directory: '' } as unknown as Record<string, string>)} multiple
+                            onChange={e => { if (e.target.files) { const md = Array.from(e.target.files).filter(f => f.name.endsWith('.md')); setLinkIndexFiles(md); if (md.length) ok(`${md.length} .md files from folder`); else err('No .md files in that folder'); } }} />
                         </label>
                         <label className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-border2 bg-surface2 hover:border-border cursor-pointer transition-all duration-150">
                           <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 10h8M6 2v6M4 5l2-2.5L8 5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" className="text-muted"/></svg>
