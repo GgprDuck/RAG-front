@@ -5,6 +5,11 @@ import {
 import React from 'react';
 import { flushSync } from 'react-dom';
 import axios from 'axios';
+import { LoginPage } from './features/auth/LoginPage';
+import { KnowledgeView } from './features/knowledge/KnowledgeView';
+import { DocumentsView } from './features/documents/DocumentsView';
+import { LinksView } from './features/links/LinksView';
+import { ChatWorkspace } from './features/chat/ChatWorkspace';
 
 type UploadMode = 'knowledge' | 'images' | 'image-query' | 'all-images' | 'all-documents' | 'advanced-rag' | 'evaluation' | 'links';
 type RerankStrategy = 'llm_based' | 'cross_encoder' | 'none';
@@ -65,70 +70,6 @@ const checkAuth = () => localStorage.getItem(AUTH_KEY) === 'true';
 const saveAuth  = () => localStorage.setItem(AUTH_KEY, 'true');
 const clearAuth = () => localStorage.removeItem(AUTH_KEY);
 
-const LoginPage: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
-  const [user, setUser]   = useState('');
-  const [pass, setPass]   = useState('');
-  const [error, setError] = useState('');
-  const [shake, setShake] = useState(false);
-  const [showPass, setShowPass] = useState(false);
-
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (user.trim() === AUTH_USER && pass === AUTH_PASS) {
-      saveAuth();
-      onLogin();
-    } else {
-      setError('Invalid username or password');
-      setShake(true);
-      setTimeout(() => setShake(false), 500);
-    }
-  };
-
-  return (
-    <div className="h-screen w-screen bg-bg flex items-center justify-center p-4">
-      <div className={`w-full max-w-[380px] ${shake ? 'animate-shake' : ''}`}>
-        <div className="text-center mb-8">
-          <div className="w-14 h-14 rounded-[16px] bg-accent mx-auto mb-4 flex items-center justify-center font-mono text-[1.3rem] font-bold text-white shadow-[0_8px_32px_color-mix(in_srgb,var(--color-accent)_35%,transparent)]">R</div>
-          <h1 className="font-sans text-[1.4rem] font-bold text-text mb-1">RAG System</h1>
-          <p className="font-mono text-[0.68rem] text-dim tracking-[.08em]">KNOWLEDGE BASE · SECURE ACCESS</p>
-        </div>
-        <div className="bg-surface border border-border rounded-2xl p-6 shadow-[0_8px_40px_rgba(0,0,0,.25)]">
-          <form onSubmit={submit} className="flex flex-col gap-4">
-            <div>
-              <label className="font-mono text-[0.6rem] tracking-[.1em] uppercase text-muted block mb-1.5">Username</label>
-              <input type="text" autoComplete="username" autoFocus value={user} onChange={e => { setUser(e.target.value); setError(''); }} placeholder="Enter username"
-                className="w-full bg-surface2 border border-border2 rounded-xl px-4 py-3 text-[0.93rem] font-sans text-text outline-none placeholder:text-dim transition-all duration-150 focus:border-accent focus:shadow-[0_0_0_3px_color-mix(in_srgb,var(--color-accent)_15%,transparent)]" />
-            </div>
-            <div>
-              <label className="font-mono text-[0.6rem] tracking-[.1em] uppercase text-muted block mb-1.5">Password</label>
-              <div className="relative">
-                <input type={showPass ? 'text' : 'password'} autoComplete="current-password" value={pass} onChange={e => { setPass(e.target.value); setError(''); }} placeholder="Enter password"
-                  className="w-full bg-surface2 border border-border2 rounded-xl px-4 py-3 pr-11 text-[0.93rem] font-sans text-text outline-none placeholder:text-dim transition-all duration-150 focus:border-accent focus:shadow-[0_0_0_3px_color-mix(in_srgb,var(--color-accent)_15%,transparent)]" />
-                <button type="button" onClick={() => setShowPass(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-dim hover:text-muted transition-colors w-7 h-7 flex items-center justify-center" tabIndex={-1}>
-                  {showPass
-                    ? <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke="currentColor" strokeWidth="1.4"/><circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.4"/><path d="M2 2l12 12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
-                    : <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke="currentColor" strokeWidth="1.4"/><circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.4"/></svg>}
-                </button>
-              </div>
-            </div>
-            {error && (
-              <div className="flex items-center gap-2 bg-[color-mix(in_srgb,var(--color-red)_8%,transparent)] border border-[color-mix(in_srgb,var(--color-red)_25%,transparent)] rounded-lg px-3 py-2">
-                <span className="text-red text-[0.75rem]">✗</span>
-                <span className="font-mono text-[0.72rem] text-red">{error}</span>
-              </div>
-            )}
-            <button type="submit" disabled={!user.trim() || !pass}
-              className={['w-full py-3 rounded-xl font-sans font-semibold text-[0.93rem] transition-all duration-150', user.trim() && pass ? 'bg-accent text-white cursor-pointer hover:bg-accent-h shadow-[0_4px_16px_color-mix(in_srgb,var(--color-accent)_30%,transparent)] hover:scale-[1.01] active:scale-[0.99]' : 'bg-surface2 border border-border2 text-dim cursor-not-allowed'].join(' ')}>
-              Sign In
-            </button>
-          </form>
-        </div>
-        <p className="text-center font-mono text-[0.58rem] text-dim mt-4 tracking-[.06em]">RAG SYSTEM · PROTECTED ACCESS</p>
-      </div>
-      <style>{`@keyframes shake{0%,100%{transform:translateX(0)}15%{transform:translateX(-6px)}30%{transform:translateX(6px)}45%{transform:translateX(-4px)}60%{transform:translateX(4px)}75%{transform:translateX(-2px)}90%{transform:translateX(2px)}}.animate-shake{animation:shake 0.45s ease;}`}</style>
-    </div>
-  );
-};
 
 const fmtTime = (ts: number) => new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 const fmtDate = (d: string | Date) => {
@@ -172,18 +113,6 @@ const EmptyChats = () => (
   <div className="flex flex-col items-center px-4 py-7 gap-2 opacity-60">
     <svg width="38" height="38" viewBox="0 0 38 38" fill="none"><rect x="3" y="7" width="32" height="22" rx="5" stroke="currentColor" strokeWidth="1.8" className="text-muted"/><path d="M10 17h18M10 22h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className="text-muted"/><path d="M13 29l-4 5M25 29l4 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" className="text-muted"/></svg>
     <span className="font-sans text-[0.74rem] text-dim text-center leading-relaxed">No chats yet.<br/>Start a new one!</span>
-  </div>
-);
-
-const Toggle: React.FC<{ checked: boolean; onChange: (v: boolean) => void; label: string; sub?: string }> = ({ checked, onChange, label, sub }) => (
-  <div onClick={() => onChange(!checked)} className="flex items-start gap-2.5 cursor-pointer select-none py-1">
-    <div className={`flex-shrink-0 w-8 h-[18px] rounded-full border relative transition-all duration-200 mt-0.5 ${checked ? 'bg-accent border-accent' : 'bg-transparent border-border2'}`}>
-      <div className={`absolute top-0.5 w-3 h-3 rounded-full transition-[left] duration-200 ${checked ? 'left-4 bg-white' : 'left-0.5 bg-border2'}`} />
-    </div>
-    <div>
-      <div className={`text-sm transition-colors duration-200 ${checked ? 'text-text' : 'text-muted'}`}>{label}</div>
-      {sub && <div className="font-mono text-[0.66rem] text-dim mt-0.5">{sub}</div>}
-    </div>
   </div>
 );
 
@@ -758,7 +687,16 @@ const RagDemo: React.FC = () => {
 
   const handleLogout = () => { clearAuth(); setIsAuthed(false); };
 
-  if (!isAuthed) return <LoginPage onLogin={() => setIsAuthed(true)} />;
+  if (!isAuthed) {
+    return (
+      <LoginPage
+        authUser={AUTH_USER}
+        authPass={AUTH_PASS}
+        onPersistAuth={saveAuth}
+        onAuthenticated={() => setIsAuthed(true)}
+      />
+    );
+  }
 
   const TABS: { id: UploadMode; label: string }[] = [
     { id: 'advanced-rag',   label: 'Chat' },
@@ -781,7 +719,7 @@ const RagDemo: React.FC = () => {
       )}
 
       {}
-      <nav className="h-[46px] bg-surface border-b border-border flex items-center px-3 sm:px-4 flex-shrink-0 overflow-x-hidden sticky top-0 z-50 gap-1">
+      <nav className="h-14 bg-surface/95 backdrop-blur border-b border-border flex items-center px-3 sm:px-5 flex-shrink-0 overflow-x-hidden sticky top-0 z-50 gap-1.5">
         {mode === 'advanced-rag' && (
           <button onClick={() => setDrawerOpen(true)} className="md:hidden w-8 h-8 flex items-center justify-center rounded-lg border border-border2 bg-surface2 text-muted cursor-pointer flex-shrink-0 mr-1">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
@@ -794,7 +732,7 @@ const RagDemo: React.FC = () => {
         <div className="flex items-center overflow-x-auto flex-1 scrollbar-none" style={{ scrollbarWidth: 'none' }}>
           {TABS.map(tab => (
             <button key={tab.id} onClick={() => setMode(tab.id)}
-              className={`bg-transparent border-b-2 cursor-pointer px-2.5 sm:px-3 h-[46px] font-sans text-[0.78rem] sm:text-[0.82rem] whitespace-nowrap transition-all duration-150 flex items-center flex-shrink-0 ${mode === tab.id ? 'text-accent border-b-accent font-semibold' : 'text-muted border-b-transparent hover:text-text'}`}>
+              className={`cursor-pointer rounded-lg px-2.5 sm:px-3 py-1.5 font-sans text-[0.78rem] sm:text-[0.82rem] whitespace-nowrap transition-all duration-150 flex items-center flex-shrink-0 ${mode === tab.id ? 'text-accent bg-accent/10 font-semibold' : 'text-muted hover:text-text hover:bg-surface2'}`}>
               {tab.label}
             </button>
           ))}
@@ -810,9 +748,19 @@ const RagDemo: React.FC = () => {
 
       {}
       {mode === 'advanced-rag' && (
-        <div className="flex-1 flex overflow-hidden">
-          <ChatSidebar chats={chats} activeChatId={activeChatId} onSelect={selectChat} onNew={createNewChat} onDelete={deleteChat} onRename={renameChat} loading={chatsLoading} />
-          <div className="flex-1 flex flex-col overflow-hidden relative">
+        <ChatWorkspace
+          sidebar={
+            <ChatSidebar
+              chats={chats}
+              activeChatId={activeChatId}
+              onSelect={selectChat}
+              onNew={createNewChat}
+              onDelete={deleteChat}
+              onRename={renameChat}
+              loading={chatsLoading}
+            />
+          }
+          messages={
             <div ref={messagesContainerRef} className="flex-1 overflow-y-auto flex flex-col px-3 sm:px-8 py-3 sm:py-5">
               {hasMessages && <>
                 {(activeChat?.messages ?? []).map((msg, i) => <MessageBubble key={i} msg={msg} onLightbox={setLightboxImg} />)}
@@ -841,14 +789,18 @@ const RagDemo: React.FC = () => {
                 <div ref={messagesEndRef} />
               </>}
             </div>
-            {showScrollBtn && hasMessages && (
+          }
+          input={
+            <>
+              {showScrollBtn && hasMessages && (
               <button onClick={scrollToBottom} className="absolute bottom-[100px] sm:bottom-[110px] right-3 sm:right-6 w-9 h-9 rounded-full bg-surface border border-border2 text-muted cursor-pointer flex items-center justify-center shadow-[0_4px_12px_rgba(0,0,0,.3)] animate-scroll-bounce hover:border-accent hover:text-accent z-[5] transition-colors">
                 <span className="mat-icon">arrow_downward</span>
               </button>
-            )}
-            <ChatInput question={question} setQuestion={setQuestion} onSend={handleAsk} onStop={handleStopStream} isStreaming={isStreaming} hasMessages={hasMessages} textareaRef={textareaRef} />
-          </div>
-        </div>
+              )}
+              <ChatInput question={question} setQuestion={setQuestion} onSend={handleAsk} onStop={handleStopStream} isStreaming={isStreaming} hasMessages={hasMessages} textareaRef={textareaRef} />
+            </>
+          }
+        />
       )}
 
       {mode !== 'advanced-rag' && (
@@ -856,123 +808,30 @@ const RagDemo: React.FC = () => {
 
           {}
           {mode === 'knowledge' && (
-            <div className="max-w-[860px] mx-auto w-full flex flex-col gap-6">
-              <div className="flex items-center gap-3 pt-1">
-                <div className="w-9 h-9 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center flex-shrink-0">
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 13V5l6-3 6 3v8" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" className="text-accent"/><rect x="5" y="8" width="2.5" height="5" rx="0.5" fill="currentColor" className="text-accent"/><rect x="8.5" y="8" width="2.5" height="5" rx="0.5" fill="currentColor" className="text-accent"/></svg>
-                </div>
-                <div>
-                  <div className="font-sans font-bold text-[1.05rem] text-text">Knowledge Base</div>
-                  <div className="font-mono text-[0.62rem] text-dim tracking-[.06em]">Ingest documents into the vector store</div>
-                </div>
-              </div>
-              <div className="bg-surface border border-border rounded-2xl overflow-hidden">
-                <div className="px-5 py-3.5 border-b border-border flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="1" y="1" width="4.5" height="4.5" rx="1" stroke="currentColor" strokeWidth="1.3" className="text-accent"/><rect x="7.5" y="1" width="4.5" height="4.5" rx="1" stroke="currentColor" strokeWidth="1.3" className="text-muted"/><rect x="1" y="7.5" width="4.5" height="4.5" rx="1" stroke="currentColor" strokeWidth="1.3" className="text-muted"/><rect x="7.5" y="7.5" width="4.5" height="4.5" rx="1" stroke="currentColor" strokeWidth="1.3" className="text-muted"/></svg>
-                    <span className="font-mono text-[0.62rem] font-semibold tracking-[.1em] uppercase text-muted">Chunking Strategy</span>
-                  </div>
-                </div>
-                <div className="p-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {([{ val: 'simple', label: 'Simple', sub: 'Split by sentences', icon: '≡' }, { val: 'semantic', label: 'Semantic', sub: 'AI embedding clusters', icon: '◈' }, { val: 'parent-child', label: 'Parent-Child', sub: 'Hierarchical chunks', icon: '⊞' }] as const).map(({ val, label, sub, icon }) => (
-                    <button key={val} onClick={() => setChunkingStrategy(val)} className={['flex flex-col items-start gap-1.5 p-4 rounded-xl border text-left transition-all duration-150 cursor-pointer', chunkingStrategy === val ? 'border-accent bg-accent/8 shadow-[0_0_0_1px_var(--color-accent)]' : 'border-border2 bg-surface2 hover:border-border hover:bg-surface'].join(' ')}>
-                      <span className={`text-[1.1rem] ${chunkingStrategy === val ? 'text-accent' : 'text-muted'}`}>{icon}</span>
-                      <div className={`font-sans font-semibold text-[0.82rem] ${chunkingStrategy === val ? 'text-text' : 'text-muted'}`}>{label}</div>
-                      <div className="font-mono text-[0.62rem] text-dim">{sub}</div>
-                    </button>
-                  ))}
-                </div>
-                <div className="px-5 pb-4">
-                  <Toggle checked={enableKnowledgeGraph} onChange={setEnableKnowledgeGraph} label="Extract Knowledge Graph" sub="Build Neo4j entity graph" />
-                </div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="bg-surface border border-border rounded-2xl overflow-hidden flex flex-col">
-                  <div className="px-5 py-3.5 border-b border-border flex items-center gap-2">
-                    <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 11.5h9M6.5 1.5v7M3.5 5.5l3-3.5 3 3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" className="text-accent"/></svg>
-                    <span className="font-mono text-[0.62rem] font-semibold tracking-[.1em] uppercase text-muted">Single File</span>
-                    <span className="ml-auto font-mono text-[0.58rem] text-dim">pdf · docx · txt · md</span>
-                  </div>
-                  <div className="p-5 flex flex-col gap-3 flex-1">
-                    <label className={['flex flex-col items-center justify-center gap-2 h-[90px] rounded-xl border-2 border-dashed cursor-pointer transition-all duration-150', file ? 'border-accent/40 bg-accent/5' : 'border-border2 hover:border-border hover:bg-surface2'].join(' ')}>
-                      <input type="file" accept=".docx,.pdf,.txt,.md" className="hidden" onChange={e => { if (e.target.files?.[0]) setFile(e.target.files[0]); }} />
-                      {file ? (<><svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M3 14h12M9 3v8M6 8l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-accent"/></svg><span className="font-mono text-[0.68rem] text-accent text-center px-3 truncate max-w-full">{file.name}</span></>) : (<><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 16h12M10 4v9M7 7l3-3 3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-dim"/></svg><span className="font-mono text-[0.65rem] text-dim">Drop file or click to browse</span></>)}
-                    </label>
-                    {file && (<div className="flex items-center gap-2 bg-surface2 rounded-lg px-3 py-2"><svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M1.5 9.5h8M5.5 1.5v6M3 4l2.5-2.5L8 4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" className="text-accent"/></svg><span className="font-mono text-[0.68rem] text-muted truncate flex-1">{file.name}</span><button onClick={() => setFile(null)} className="text-dim hover:text-muted flex-shrink-0 font-mono text-[0.65rem]">✕</button></div>)}
-                    <Btn onClick={handleUploadKnowledge} disabled={busy || !file} accent={!busy && !!file}>{busy ? <span className="flex items-center justify-center gap-2"><Spin/>Uploading…</span> : 'Upload File'}</Btn>
-                  </div>
-                </div>
-                <div className="bg-surface border border-border rounded-2xl overflow-hidden flex flex-col">
-                  <div className="px-5 py-3.5 border-b border-border flex items-center gap-2">
-                    <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1.5 4.5h10v6.5a1 1 0 0 1-1 1h-8a1 1 0 0 1-1-1V4.5z" stroke="currentColor" strokeWidth="1.3" className="text-accent"/><path d="M1.5 4.5V3a1 1 0 0 1 1-1h2.5l1 1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" className="text-accent"/></svg>
-                    <span className="font-mono text-[0.62rem] font-semibold tracking-[.1em] uppercase text-muted">Markdown Folder</span>
-                    <span className="ml-auto font-mono text-[0.58rem] text-dim">.md only</span>
-                  </div>
-                  <div className="p-5 flex flex-col gap-3 flex-1">
-                    <div className="flex flex-col gap-2">
-                      <label className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-border2 bg-surface2 hover:border-border cursor-pointer transition-all duration-150">
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 3.5h10v7a.5.5 0 0 1-.5.5h-9a.5.5 0 0 1-.5-.5v-7z" stroke="currentColor" strokeWidth="1.2" className="text-muted"/><path d="M1 3.5V2.5a.5.5 0 0 1 .5-.5H4l.8 1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" className="text-muted"/></svg>
-                        <span className="font-mono text-[0.65rem] text-muted flex-1">Folder picker</span><span className="font-mono text-[0.55rem] text-dim">Chrome/Edge</span>
-                        <input type="file" className="hidden" {...({ webkitdirectory: '', directory: '' } as unknown as Record<string, string>)} multiple onChange={e => { if (e.target.files) { const md = Array.from(e.target.files).filter(f => f.name.endsWith('.md')); setFolderFiles(md); if (md.length) ok(`${md.length} .md files`); else err('No .md files'); } }} />
-                      </label>
-                      <label className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-border2 bg-surface2 hover:border-border cursor-pointer transition-all duration-150">
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 10h8M6 2v6M4 5l2-2.5L8 5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" className="text-muted"/></svg>
-                        <span className="font-mono text-[0.65rem] text-muted flex-1">Multi-select .md</span><span className="font-mono text-[0.55rem] text-dim">All browsers</span>
-                        <input type="file" className="hidden" multiple accept=".md" onChange={e => { if (e.target.files) { const md = Array.from(e.target.files); setFolderFiles(md); ok(`${md.length} file(s)`); } }} />
-                      </label>
-                    </div>
-                    {folderFiles.length > 0 && (<div className="flex items-center gap-2 bg-accent/6 border border-accent/20 rounded-lg px-3 py-2"><span className="font-mono text-[0.65rem] text-accent font-semibold">{folderFiles.length}</span><span className="font-mono text-[0.65rem] text-muted truncate flex-1">{folderFiles.slice(0,3).map(f=>f.name).join(', ')}{folderFiles.length>3?` +${folderFiles.length-3} more`:''}</span><button onClick={() => setFolderFiles([])} className="text-dim hover:text-muted flex-shrink-0 font-mono text-[0.65rem]">✕</button></div>)}
-                    <Btn onClick={handleUploadFolder} disabled={busy || !folderFiles.length} accent={!busy && folderFiles.length > 0}>{busy ? <span className="flex items-center justify-center gap-2"><Spin/>Uploading…</span> : folderFiles.length ? `Upload ${folderFiles.length} Files` : 'Upload Files'}</Btn>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <KnowledgeView
+              chunkingStrategy={chunkingStrategy}
+              setChunkingStrategy={setChunkingStrategy}
+              enableKnowledgeGraph={enableKnowledgeGraph}
+              setEnableKnowledgeGraph={setEnableKnowledgeGraph}
+              file={file}
+              setFile={setFile}
+              folderFiles={folderFiles}
+              setFolderFiles={setFolderFiles}
+              handleUploadKnowledge={handleUploadKnowledge}
+              handleUploadFolder={handleUploadFolder}
+              busy={busy}
+              ok={ok}
+              err={err}
+            />
           )}
 
           {}
           {mode === 'all-documents' && (
-            <div className="max-w-[860px] mx-auto w-full flex flex-col gap-5">
-              <div className="flex items-center justify-between pt-1">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center flex-shrink-0">
-                    <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M3 2h6.5L12 4.5V13H3V2z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" className="text-accent"/><path d="M9 2v3h3" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" className="text-accent"/><path d="M5 7h5M5 9.5h3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" className="text-accent"/></svg>
-                  </div>
-                  <div>
-                    <div className="font-sans font-bold text-[1.05rem] text-text">Document Store</div>
-                    <div className="font-mono text-[0.62rem] text-dim tracking-[.06em]">{allDocuments.length} chunk{allDocuments.length !== 1 ? 's' : ''} indexed</div>
-                  </div>
-                </div>
-              </div>
-              {allDocuments.length > 0 ? (
-                <div className="flex flex-col gap-2.5">
-                  {allDocuments.map((doc, idx) => (
-                    <div key={doc.id} className="group bg-surface border border-border rounded-2xl overflow-hidden hover:border-border2 transition-all duration-150">
-                      <div className="flex items-center gap-3 px-4 py-3 border-b border-border/50">
-                        <div className="w-6 h-6 rounded-md bg-surface2 border border-border2 flex items-center justify-center flex-shrink-0"><span className="font-mono text-[0.55rem] text-dim">{String(idx + 1).padStart(2, '0')}</span></div>
-                        <div className="flex items-center gap-2 flex-1 min-w-0">
-                          <span className="font-mono text-[0.62rem] text-dim truncate">{doc.id.slice(0, 16)}…</span>
-                          {doc.createdAt && <span className="font-mono text-[0.58rem] text-dim/60 flex-shrink-0 hidden sm:inline">{new Date(doc.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</span>}
-                          {doc.model && <span className="font-mono text-[0.58rem] px-1.5 py-px rounded border border-border2 text-dim flex-shrink-0 hidden sm:inline">{doc.model}</span>}
-                        </div>
-                        <button onClick={() => handleDeleteDoc(doc.id)} disabled={busy} className="opacity-0 group-hover:opacity-100 flex items-center gap-1.5 font-mono text-[0.65rem] text-red bg-red/5 border border-red/20 rounded-lg py-1 px-2.5 cursor-pointer hover:bg-red/10 transition-all duration-150 flex-shrink-0">
-                          <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 2.5h6M4 1h2M3.5 2.5v5.5M6.5 2.5v5.5M2 2.5l.5 6h5l.5-6" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                          Delete
-                        </button>
-                      </div>
-                      <div className="px-4 py-3">
-                        <p className="font-mono text-[0.74rem] sm:text-[0.78rem] text-muted leading-[1.75] m-0 line-clamp-3">{doc.text.slice(0, 340)}{doc.text.length > 340 ? '…' : ''}</p>
-                        {doc.text.length > 200 && <div className="mt-2 flex items-center gap-1.5"><div className="flex-1 h-px bg-border/40" /><span className="font-mono text-[0.56rem] text-dim/50">{doc.text.length} chars</span></div>}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-24 gap-4 opacity-50">
-                  <svg width="44" height="44" viewBox="0 0 44 44" fill="none"><rect x="6" y="4" width="24" height="32" rx="3" stroke="currentColor" strokeWidth="1.6" className="text-muted"/><path d="M14 14h12M14 20h12M14 26h7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="text-muted"/><path d="M26 4v8h8" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" className="text-muted"/></svg>
-                  <div className="text-center"><div className="font-sans text-[0.9rem] text-muted font-medium mb-1">No documents yet</div><div className="font-mono text-[0.65rem] text-dim">Upload files in the Knowledge tab to get started</div></div>
-                </div>
-              )}
-            </div>
+            <DocumentsView
+              allDocuments={allDocuments}
+              busy={busy}
+              handleDeleteDoc={handleDeleteDoc}
+            />
           )}
 
           {}
@@ -1012,189 +871,29 @@ const RagDemo: React.FC = () => {
 
           {}
           {mode === 'links' && (
-            <div className="max-w-[860px] mx-auto w-full flex flex-col gap-5">
-
-              {}
-              <div className="flex items-center gap-3 pt-1">
-                <div className="w-9 h-9 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center flex-shrink-0">
-                  <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
-                    <path d="M9 6l-4 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" className="text-accent"/>
-                    <path d="M6.5 3.5l1.5-1.5a3 3 0 0 1 4.243 4.243L10.5 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" className="text-accent"/>
-                    <path d="M8.5 11.5L7 13a3 3 0 0 1-4.243-4.243L4.5 7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" className="text-accent"/>
-                  </svg>
-                </div>
-                <div>
-                  <div className="font-sans font-bold text-[1.05rem] text-text">Knowledge Links</div>
-                  <div className="font-mono text-[0.62rem] text-dim tracking-[.06em]">Index · search · query · manage</div>
-                </div>
-              </div>
-
-              {}
-              <div className="flex gap-1 bg-surface2 border border-border rounded-xl p-1 w-fit">
-                {(['view', 'search', 'query', 'index'] as const).map(t => (
-                  <button key={t} onClick={() => { setLinkMode(t); setLinkQueryResult(null); }}
-                    className={['px-3.5 py-1.5 rounded-lg font-mono text-[0.65rem] tracking-[.06em] uppercase transition-all duration-150 cursor-pointer border-none', linkMode === t ? 'bg-accent text-white shadow-[0_2px_8px_color-mix(in_srgb,var(--color-accent)_35%,transparent)]' : 'text-muted hover:text-text bg-transparent'].join(' ')}>
-                    {t}
-                  </button>
-                ))}
-              </div>
-
-              {}
-              {linkMode === 'view' && (
-                <div className="flex flex-col gap-4">
-                  <div className="bg-surface border border-border rounded-2xl p-4 flex flex-col sm:flex-row gap-3 flex-wrap">
-                    <input type="text" value={linkSourceFilter} onChange={e => setLinkSourceFilter(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleFetchLinks()} placeholder="Filter by sourceFile (optional)"
-                      className="flex-1 min-w-0 bg-surface2 border border-border2 rounded-xl px-4 py-2.5 font-sans text-[0.88rem] text-text outline-none placeholder:text-dim transition-all duration-150 focus:border-accent" />
-                    <button onClick={handleFetchLinks} disabled={linksLoading}
-                      className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border border-accent-bd bg-accent-bg text-accent font-sans text-[0.82rem] font-semibold cursor-pointer hover:bg-accent hover:text-white transition-all duration-150 flex-shrink-0 disabled:opacity-40">
-                      {linksLoading ? <><Spin size={11} />Loading…</> : 'Fetch Links'}
-                    </button>
-                    <div className="flex gap-2 sm:border-l sm:border-border sm:pl-3 w-full sm:w-auto">
-                      <input type="text" value={linkDeleteSource} onChange={e => setLinkDeleteSource(e.target.value)} placeholder="sourceFile to delete"
-                        className="flex-1 min-w-0 bg-surface2 border border-border2 rounded-xl px-3 py-2.5 font-sans text-[0.82rem] text-text outline-none placeholder:text-dim transition-all duration-150 focus:border-[color-mix(in_srgb,var(--color-red)_60%,transparent)]" />
-                      <button onClick={() => handleDeleteLinksBySource()} disabled={linksLoading || !linkDeleteSource.trim()}
-                        className="px-4 py-2.5 rounded-xl font-sans text-[0.82rem] font-semibold border border-[color-mix(in_srgb,var(--color-red)_25%,transparent)] bg-[color-mix(in_srgb,var(--color-red)_8%,transparent)] text-red cursor-pointer hover:bg-[color-mix(in_srgb,var(--color-red)_15%,transparent)] transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0">
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-
-                  {links.length > 0 ? (
-                    <>
-                      <div className="font-mono text-[0.62rem] text-dim tracking-[.06em]">{links.length} link(s)</div>
-                      <div className="flex flex-col gap-2">
-                        {links.map((link, i) => (
-                          <div key={link.id ?? i} className="group bg-surface border border-border rounded-2xl overflow-hidden hover:border-border2 transition-all duration-150">
-                            <div className="flex items-center gap-3 px-4 py-2.5 border-b border-border/50">
-                              <span className="font-mono text-[0.58rem] text-dim w-5 flex-shrink-0">{String(i + 1).padStart(2, '0')}</span>
-                              <span className="font-mono text-[0.65rem] text-muted truncate flex-1">{link.sourceFile}</span>
-                              <button onClick={() => handleDeleteLinksBySource(link.sourceFile)}
-                                className="opacity-0 group-hover:opacity-100 font-mono text-[0.6rem] text-red border border-red/20 bg-red/5 rounded-lg px-2 py-1 cursor-pointer hover:bg-red/10 transition-all duration-150 flex-shrink-0">
-                                delete source
-                              </button>
-                            </div>
-                            <div className="px-4 py-3">
-                              <a href={link.url} target="_blank" rel="noopener noreferrer" className="font-sans text-[0.88rem] text-accent underline underline-offset-2 decoration-[color-mix(in_srgb,var(--color-accent)_35%,transparent)] break-all hover:opacity-80">{link.url}</a>
-                              {link.title && <div className="font-sans text-[0.82rem] text-text mt-1 font-medium">{link.title}</div>}
-                              {link.description && <p className="font-mono text-[0.72rem] text-muted mt-1 leading-relaxed m-0 line-clamp-2">{link.description}</p>}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </>
-                  ) : (
-                    !linksLoading && (
-                      <div className="flex flex-col items-center justify-center py-20 gap-3 opacity-50">
-                        <svg width="40" height="40" viewBox="0 0 40 40" fill="none"><path d="M22 18l-8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" className="text-muted"/><path d="M17 11l3-3a8 8 0 0 1 11.314 11.314L28 22.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" className="text-muted"/><path d="M23 29l-3 3A8 8 0 0 1 8.686 20.686L12 17.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" className="text-muted"/></svg>
-                        <div className="font-sans text-[0.85rem] text-muted text-center">No links found.<br/>Index some .md files first.</div>
-                      </div>
-                    )
-                  )}
-                </div>
-              )}
-
-              {}
-              {(linkMode === 'search' || linkMode === 'query') && (
-                <div className="flex flex-col gap-4">
-                  <div className="bg-surface border border-border rounded-2xl p-5 flex flex-col gap-3">
-                    <div>
-                      <div className="font-mono text-[0.6rem] font-semibold tracking-[.1em] uppercase text-dim mb-1.5">{linkMode === 'search' ? 'Keyword Search' : 'Context Query'}</div>
-                      <p className="font-sans text-[0.8rem] text-muted mb-3">{linkMode === 'search' ? 'Searches by keyword — returns links regardless of topic.' : 'Returns links only when the query is link-related; 404 otherwise.'}</p>
-                      <div className="flex gap-2">
-                        <input type="text" value={linkQuery} onChange={e => setLinkQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && (linkMode === 'search' ? handleSearchLinks() : handleQueryLinks())}
-                          placeholder={linkMode === 'search' ? 'e.g. typescript, react…' : 'e.g. Where can I find docs for X?'}
-                          className="flex-1 bg-surface2 border border-border2 rounded-xl px-4 py-2.5 font-sans text-[0.88rem] text-text outline-none placeholder:text-dim transition-all duration-150 focus:border-accent" />
-                        <button onClick={linkMode === 'search' ? handleSearchLinks : handleQueryLinks} disabled={linksLoading || !linkQuery.trim()}
-                          className="px-5 py-2.5 rounded-xl border border-accent-bd bg-accent-bg text-accent font-sans text-[0.82rem] font-semibold cursor-pointer hover:bg-accent hover:text-white transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0">
-                          {linksLoading ? <span className="flex items-center gap-2"><Spin size={11} />…</span> : linkMode === 'search' ? 'Search' : 'Query'}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {linkQueryResult && (
-                    <div className="flex flex-col gap-3">
-                      <div className="flex items-center gap-3">
-                        <span className="font-mono text-[0.62rem] text-dim">{linkQueryResult.total} result(s) for</span>
-                        <Tag color="blue">"{linkQueryResult.query}"</Tag>
-                      </div>
-                      {linkQueryResult.block && (
-                        <div className="bg-surface border border-accent/20 rounded-2xl p-4">
-                          <div className="font-mono text-[0.58rem] font-semibold tracking-[.1em] uppercase text-dim mb-2">Context Block</div>
-                          <pre className="font-mono text-[0.76rem] text-muted leading-[1.75] whitespace-pre-wrap m-0 overflow-x-auto">{linkQueryResult.block}</pre>
-                        </div>
-                      )}
-                      {linkQueryResult.links.length > 0 ? (
-                        <div className="flex flex-col gap-2">
-                          {linkQueryResult.links.map((link, i) => (
-                            <div key={link.id ?? i} className="bg-surface border border-border rounded-2xl overflow-hidden">
-                              <div className="flex items-center gap-3 px-4 py-2.5 border-b border-border/50">
-                                <span className="font-mono text-[0.58rem] text-dim w-5">{String(i + 1).padStart(2, '0')}</span>
-                                <span className="font-mono text-[0.65rem] text-muted truncate">{link.sourceFile}</span>
-                              </div>
-                              <div className="px-4 py-3">
-                                <a href={link.url} target="_blank" rel="noopener noreferrer" className="font-sans text-[0.88rem] text-accent underline underline-offset-2 break-all hover:opacity-80">{link.url}</a>
-                                {link.title && <div className="font-sans text-[0.82rem] text-text mt-1 font-medium">{link.title}</div>}
-                                {link.description && <p className="font-mono text-[0.72rem] text-muted mt-1 leading-relaxed m-0 line-clamp-2">{link.description}</p>}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-center font-sans text-[0.85rem] text-muted py-10">No links returned for this query.</div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {}
-              {linkMode === 'index' && (
-                <div className="flex flex-col gap-4">
-                  <div className="bg-surface border border-border rounded-2xl overflow-hidden">
-                    <div className="px-5 py-3.5 border-b border-border flex items-center gap-2">
-                      <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 11.5h9M6.5 1.5v7M3.5 5.5l3-3.5 3 3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" className="text-accent"/></svg>
-                      <span className="font-mono text-[0.62rem] font-semibold tracking-[.1em] uppercase text-muted">Upload .md files to index links</span>
-                      <span className="ml-auto font-mono text-[0.58rem] text-dim">.md only · max 200 files</span>
-                    </div>
-                    <div className="p-5 flex flex-col gap-3">
-                      <div className="flex flex-col gap-2">
-                        <label className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-border2 bg-surface2 hover:border-border cursor-pointer transition-all duration-150">
-                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 3.5h10v7a.5.5 0 0 1-.5.5h-9a.5.5 0 0 1-.5-.5v-7z" stroke="currentColor" strokeWidth="1.2" className="text-muted"/><path d="M1 3.5V2.5a.5.5 0 0 1 .5-.5H4l.8 1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" className="text-muted"/></svg>
-                          <span className="font-mono text-[0.65rem] text-muted flex-1">Folder picker</span>
-                          <span className="font-mono text-[0.55rem] text-dim">Chrome / Edge</span>
-                          <input type="file" className="hidden" {...({ webkitdirectory: '', directory: '' } as unknown as Record<string, string>)} multiple
-                            onChange={e => { if (e.target.files) { const md = Array.from(e.target.files).filter(f => f.name.endsWith('.md')); setLinkIndexFiles(md); if (md.length) ok(`${md.length} .md files from folder`); else err('No .md files in that folder'); } }} />
-                        </label>
-                        <label className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-border2 bg-surface2 hover:border-border cursor-pointer transition-all duration-150">
-                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 10h8M6 2v6M4 5l2-2.5L8 5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" className="text-muted"/></svg>
-                          <span className="font-mono text-[0.65rem] text-muted flex-1">Multi-select .md</span>
-                          <span className="font-mono text-[0.55rem] text-dim">All browsers</span>
-                          <input type="file" className="hidden" multiple accept=".md"
-                            onChange={e => { if (e.target.files) { const md = Array.from(e.target.files); setLinkIndexFiles(md); ok(`${md.length} file(s) selected`); } }} />
-                        </label>
-                      </div>
-                      {linkIndexFiles.length > 0 && (
-                        <div className="flex items-center gap-2 bg-accent/6 border border-accent/20 rounded-xl px-3.5 py-2">
-                          <span className="font-mono text-[0.65rem] text-accent font-semibold">{linkIndexFiles.length}</span>
-                          <span className="font-mono text-[0.65rem] text-muted flex-1 truncate">{linkIndexFiles.slice(0, 4).map(f => f.name).join(', ')}{linkIndexFiles.length > 4 ? ` +${linkIndexFiles.length - 4} more` : ''}</span>
-                          <button onClick={() => setLinkIndexFiles([])} className="text-dim hover:text-muted font-mono text-[0.65rem] flex-shrink-0">✕</button>
-                        </div>
-                      )}
-                      <Btn onClick={handleIndexLinks} disabled={busy || !linkIndexFiles.length} accent={!busy && linkIndexFiles.length > 0}>
-                        {busy ? <span className="flex items-center justify-center gap-2"><Spin />Indexing…</span> : linkIndexFiles.length ? `Index ${linkIndexFiles.length} File(s)` : 'Select files first'}
-                      </Btn>
-                    </div>
-                  </div>
-                  <div className="bg-surface2 border border-border rounded-xl px-4 py-3 flex gap-3">
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="flex-shrink-0 mt-0.5"><circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="1.3" className="text-dim"/><path d="M7 6v4M7 4.5v.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" className="text-dim"/></svg>
-                    <p className="font-mono text-[0.68rem] text-muted leading-relaxed m-0">
-                      The <span className="text-accent">POST /links/index-links</span> endpoint extracts all hyperlinks from the uploaded markdown files, stores them keyed by <span className="text-accent">sourceFile</span>, and returns a count of files processed and links indexed.
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
+            <LinksView
+              links={links}
+              linkMode={linkMode}
+              setLinkMode={setLinkMode}
+              linkSourceFilter={linkSourceFilter}
+              setLinkSourceFilter={setLinkSourceFilter}
+              linkDeleteSource={linkDeleteSource}
+              setLinkDeleteSource={setLinkDeleteSource}
+              linkQuery={linkQuery}
+              setLinkQuery={setLinkQuery}
+              linksLoading={linksLoading}
+              linkQueryResult={linkQueryResult}
+              setLinkQueryResult={setLinkQueryResult}
+              linkIndexFiles={linkIndexFiles}
+              setLinkIndexFiles={setLinkIndexFiles}
+              handleFetchLinks={handleFetchLinks}
+              handleDeleteLinksBySource={handleDeleteLinksBySource}
+              handleSearchLinks={handleSearchLinks}
+              handleQueryLinks={handleQueryLinks}
+              handleIndexLinks={handleIndexLinks}
+              busy={busy}
+              ok={ok}
+            />
           )}
 
         </main>
